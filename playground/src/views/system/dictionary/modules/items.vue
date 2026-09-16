@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Dictionary, DictionaryItem } from '#/api/system/dictionary';
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { useVbenDrawer } from '@vben/common-ui';
@@ -12,6 +12,7 @@ import { Alert, Button, message } from 'antdv-next';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import {
   deleteDictionaryItem,
+  exportDictionaryItems,
   getDictionaryItems,
   itemPermission,
 } from '#/api/system/dictionary';
@@ -22,6 +23,9 @@ import Form from './form.vue';
 const props = defineProps<{ dictionary: Dictionary }>();
 const { hasAccessByCodes } = useAccess();
 const can = (action: string) => hasAccessByCodes([itemPermission(action)]);
+const exporting = ref(false);
+// 记录已提交的查询条件；表单尚未提交的输入不改变当前列表的导出范围。
+let appliedFilters: Record<string, unknown> = {};
 const queryAllowed = computed(() => can('query'));
 const [FormDrawer, formApi] = useVbenDrawer({
   connectedComponent: Form,
@@ -60,19 +64,32 @@ const [Grid, gridApi] = useVbenVxeGrid<DictionaryItem>({
         query: async (
           { page }: { page: { currentPage: number; pageSize: number } },
           values: Record<string, unknown>,
-        ) =>
-          queryAllowed.value
+        ) => {
+          appliedFilters = { ...values };
+          return queryAllowed.value
             ? getDictionaryItems(props.dictionary.id, {
                 ...values,
                 page: page.currentPage,
                 size: Math.min(page.pageSize, 200),
               })
-            : { items: [], total: 0 },
+            : { items: [], total: 0 };
+        },
       },
     },
     toolbarConfig: { refresh: true, search: true, export: false, custom: true },
   },
 });
+async function exportRows() {
+  if (exporting.value) return;
+  exporting.value = true;
+  try {
+    await exportDictionaryItems(props.dictionary.id, appliedFilters);
+  } catch {
+    // 请求层已提示业务或网络错误，失败时不触发下载。
+  } finally {
+    exporting.value = false;
+  }
+}
 function edit(row?: DictionaryItem) {
   formApi
     .setData({ kind: 'item', dictionaryId: props.dictionary.id, row })
@@ -114,6 +131,9 @@ function actions(row: DictionaryItem) {
       :table-title-help="dictionary.type"
     >
       <template #toolbar-tools>
+        <Button v-if="can('export')" :loading="exporting" @click="exportRows">
+          导出字典项
+        </Button>
         <Button v-if="can('add')" type="primary" @click="() => edit()">
           <Plus class="size-4" />新增字典项
         </Button>

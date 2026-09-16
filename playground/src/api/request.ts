@@ -79,6 +79,19 @@ requestClient.addResponseInterceptor({
     throw error;
   },
 });
+requestClient.addResponseInterceptor({
+  rejected: async (error) => {
+    const data = error.response?.data;
+    if (data instanceof Blob && data.type.includes('json')) {
+      try {
+        error.response.data = JSON.parse(await data.text());
+      } catch {
+        // 非法 JSON 交由统一 HTTP 状态提示，不展示下载内容。
+      }
+    }
+    throw error;
+  },
+});
 requestClient.addResponseInterceptor(
   errorMessageResponseInterceptor((msg, error) => {
     message.error(error.response?.data?.message || msg);

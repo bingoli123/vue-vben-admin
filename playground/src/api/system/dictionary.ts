@@ -1,5 +1,9 @@
 import type { PageResult } from './admin';
 
+import { downloadFileFromBlob } from '@vben/utils';
+
+import { message } from 'antdv-next';
+
 import { requestClient } from '#/api/request';
 
 /** 主键与审计人均为字符串；表单仅发送业务白名单和读取时的版本号。 */
@@ -83,3 +87,43 @@ export const deleteDictionaryItem = (
   requestClient.delete(`${itemsPath(dictionaryId)}/${row.id}`, {
     params: { version: row.version },
   });
+
+/** 只发送业务筛选项，不传分页；沿用统一会话、续期和 HTTP 错误处理。 */
+export async function exportDictionaries(params: Record<string, unknown>) {
+  await download(
+    `${root}/export`,
+    { name: params.name, type: params.type },
+    '数据字典.xlsx',
+  );
+}
+export async function exportDictionaryItems(
+  dictionaryId: string,
+  params: Record<string, unknown>,
+) {
+  await download(
+    `${itemsPath(dictionaryId)}/export`,
+    { label: params.label, value: params.value },
+    '字典项.xlsx',
+  );
+}
+async function download(
+  path: string,
+  params: Record<string, unknown>,
+  fileName: string,
+) {
+  const source = await requestClient.get<Blob>(path, {
+    params,
+    responseType: 'blob',
+    responseReturn: 'body',
+  });
+  // 即使代理错误地返回 200 JSON/HTML，也不触发一个伪成功的文件下载。
+  if (
+    source.type !==
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    source.size === 0
+  ) {
+    message.error('导出失败，未收到有效的 Excel 文件，请重试');
+    return;
+  }
+  downloadFileFromBlob({ source, fileName });
+}

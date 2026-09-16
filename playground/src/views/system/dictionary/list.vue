@@ -13,6 +13,7 @@ import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import {
   deleteDictionary,
   dictionaryPermission,
+  exportDictionaries,
   getDictionaries,
 } from '#/api/system/dictionary';
 
@@ -24,6 +25,9 @@ const selected = ref<Dictionary>();
 const { hasAccessByCodes } = useAccess();
 const can = (action: string) =>
   hasAccessByCodes([dictionaryPermission(action)]);
+const exporting = ref(false);
+// 记录已提交的查询条件；表单尚未提交的输入不改变当前列表的导出范围。
+let appliedFilters: Record<string, unknown> = {};
 const queryAllowed = computed(() => can('query'));
 const [FormDrawer, formApi] = useVbenDrawer({
   connectedComponent: Form,
@@ -74,6 +78,7 @@ const [Grid, gridApi] = useVbenVxeGrid<Dictionary>({
           { page }: { page: { currentPage: number; pageSize: number } },
           values: Record<string, unknown>,
         ) => {
+          appliedFilters = { ...values };
           const revision = ++queryRevision;
           const result = queryAllowed.value
             ? await getDictionaries({
@@ -97,6 +102,17 @@ const [Grid, gridApi] = useVbenVxeGrid<Dictionary>({
     toolbarConfig: { refresh: true, search: true, export: false, custom: true },
   },
 });
+async function exportRows() {
+  if (exporting.value) return;
+  exporting.value = true;
+  try {
+    await exportDictionaries(appliedFilters);
+  } catch {
+    // 请求层已提示业务或网络错误，失败时不触发下载。
+  } finally {
+    exporting.value = false;
+  }
+}
 function edit(row?: Dictionary) {
   formApi.setData({ kind: 'dictionary', row }).open();
 }
@@ -146,6 +162,13 @@ function actions(row: Dictionary) {
           table-title-help="点击字典类型维护右侧字典项"
         >
           <template #toolbar-tools>
+            <Button
+              v-if="can('export')"
+              :loading="exporting"
+              @click="exportRows"
+            >
+              导出字典
+            </Button>
             <Button v-if="can('add')" type="primary" @click="() => edit()">
               <Plus class="size-4" />新增字典
             </Button>
