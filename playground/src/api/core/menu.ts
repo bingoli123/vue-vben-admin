@@ -21,6 +21,7 @@ const pages: Record<string, string> = {
   '/admin/units': '/system/dept/list',
   '/admin/roles': '/system/role/list',
   '/admin/dictionaries': '/system/dictionary/list',
+  '/admin/code-rules': '/system/code-rule/list',
   '/admin/menus': '/system/menu/list',
   '/reports/designer': '/reports/index',
 };

@@ -21,6 +21,17 @@ const node = (
   ...extra,
 });
 describe('后端菜单投影', () => {
+  it('编码规则仅为授权菜单生成入口', () => {
+    const routes = navigationRoutes([
+      node('numbering', { url: '/admin/code-rules' }),
+      node('denied-numbering', { url: '/admin/code-rules', accessible: false }),
+    ]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({
+      component: '/system/code-rule/list',
+      meta: { menuId: 'numbering' },
+    });
+  });
   it('文档菜单映射到正式文件夹页面，未授权入口不产生路由', () => {
     const routes = navigationRoutes([
       node('docs', { url: '/documents' }),
