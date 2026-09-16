@@ -1,12 +1,50 @@
 import type { Folder } from '#/api/documents/folders';
 
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getFolder, getFolders } from '#/api/documents/folders';
+import { getFolder, getFolders, getFolderUnits } from '#/api/documents/folders';
 
 import Documents from './index.vue';
+
+// 测试仅加载实际用到的组件，避免日期选择器的 Node ESM 扩展名兼容问题。
+vi.mock('antdv-next', async () => {
+  const AlertModule = await import('antdv-next/dist/alert/index');
+  const ButtonModule = await import('antdv-next/dist/button/index');
+  const CardModule = await import('antdv-next/dist/card/index');
+  const DescriptionsModule = await import('antdv-next/dist/descriptions/index');
+  const EmptyModule = await import('antdv-next/dist/empty/index');
+  const FormModule = await import('antdv-next/dist/form/index');
+  const InputModule = await import('antdv-next/dist/input/index');
+  const InputNumberModule = await import('antdv-next/dist/input-number/index');
+  const messageModule = await import('antdv-next/dist/message/index');
+  const ModalModule = await import('antdv-next/dist/modal/index');
+  const SpaceModule = await import('antdv-next/dist/space/index');
+  const SpinModule = await import('antdv-next/dist/spin/index');
+  const TableModule = await import('antdv-next/dist/table/index');
+  const TreeModule = await import('antdv-next/dist/tree/index');
+  const TreeSelectModule = await import('antdv-next/dist/tree-select/index');
+  return {
+    Alert: AlertModule.default,
+    Button: ButtonModule.default,
+    Card: CardModule.default,
+    Descriptions: DescriptionsModule.default,
+    Empty: EmptyModule.default,
+    Form: FormModule.default,
+    Input: InputModule.default,
+    InputNumber: InputNumberModule.default,
+    message: messageModule.default,
+    Modal: ModalModule.default,
+    Space: SpaceModule.default,
+    Spin: SpinModule.default,
+    Table: TableModule.default,
+    Tree: TreeModule.default,
+    TreeSelect: TreeSelectModule.default,
+    DescriptionsItem: DescriptionsModule.DescriptionsItem,
+    FormItem: FormModule.FormItem,
+  };
+});
 
 const permissions = vi.hoisted(
   () => new Set(['add', 'delete', 'edit', 'query']),
@@ -75,6 +113,32 @@ afterEach(() => {
 });
 
 describe('文档文件夹页面', () => {
+  it('新增子目录等待单位候选时切换树，不改变点击时的父目录', async () => {
+    let finishOptions: ((units: []) => void) | undefined;
+    vi.mocked(getFolderUnits).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOptions = resolve;
+        }),
+    );
+    wrapper = mount(Documents, { attachTo: document.body });
+    await flushPromises();
+    await required(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === '新增子文件夹'),
+    ).trigger('click');
+    await required(
+      wrapper
+        .findAll('.ant-tree-title')
+        .find((node) => node.text() === '其他根'),
+    ).trigger('click');
+    await flushPromises();
+    required(finishOptions)([]);
+    await flushPromises();
+    const dialog = new DOMWrapper(document.body).find('[role="dialog"]');
+    expect(dialog.text()).toContain('根目录');
+  });
   it('选中当前目录只显示直接内容，刷新后保留选择', async () => {
     wrapper = mount(Documents, { attachTo: document.body });
     await flushPromises();

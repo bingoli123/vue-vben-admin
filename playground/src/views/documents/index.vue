@@ -8,23 +8,25 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
-import Alert from 'antdv-next/dist/alert/index';
-import Button from 'antdv-next/dist/button/index';
-import Card from 'antdv-next/dist/card/index';
-import Descriptions, {
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
   DescriptionsItem,
-} from 'antdv-next/dist/descriptions/index';
-import Empty from 'antdv-next/dist/empty/index';
-import Form, { FormItem } from 'antdv-next/dist/form/index';
-import InputNumber from 'antdv-next/dist/input-number/index';
-import Input from 'antdv-next/dist/input/index';
-import message from 'antdv-next/dist/message/index';
-import Modal from 'antdv-next/dist/modal/index';
-import Space from 'antdv-next/dist/space/index';
-import Spin from 'antdv-next/dist/spin/index';
-import Table from 'antdv-next/dist/table/index';
-import TreeSelect from 'antdv-next/dist/tree-select/index';
-import Tree from 'antdv-next/dist/tree/index';
+  Empty,
+  Form,
+  FormItem,
+  Input,
+  InputNumber,
+  message,
+  Modal,
+  Space,
+  Spin,
+  Table,
+  Tree,
+  TreeSelect,
+} from 'antdv-next';
 
 import {
   deleteFolder,
@@ -136,13 +138,13 @@ watch(
   },
 );
 async function openForm(mode: 'child' | 'edit' | 'root') {
+  // 操作目标固定为点击时的目录，异步加载候选期间切换树不应改变新增归属。
+  const target = selected.value;
   opening.value = true;
   try {
     const [options, current] = await Promise.all([
       getFolderUnits(),
-      mode === 'edit' && selected.value
-        ? getFolder(selected.value.id)
-        : undefined,
+      mode === 'edit' && target ? getFolder(target.id) : undefined,
     ]);
     units.value = options;
     existing.value = current;
@@ -158,19 +160,26 @@ async function openForm(mode: 'child' | 'edit' | 'root') {
           }
         : {
             name: '',
-            parentId: mode === 'child' ? selected.value?.id : undefined,
-            unitId: mode === 'child' ? selected.value?.unitId : undefined,
+            parentId: mode === 'child' ? target?.id : undefined,
+            unitId: mode === 'child' ? target?.unitId : undefined,
             sortOrder: 0,
             description: '',
           },
     );
     modalOpen.value = true;
+  } catch {
+    // 请求客户端已显示接口错误；候选或详情加载失败时不打开可提交的表单。
   } finally {
     opening.value = false;
   }
 }
 async function submit() {
-  await formRef.value?.validate();
+  try {
+    await formRef.value?.validate();
+  } catch {
+    // 字段错误由表单就地展示，不能继续提交或形成未处理的异步异常。
+    return;
+  }
   saving.value = true;
   try {
     const saved = await saveFolder(
@@ -187,6 +196,8 @@ async function submit() {
     modalOpen.value = false;
     message.success('文件夹已保存');
     await reload(saved.id);
+  } catch {
+    // 接口错误由请求客户端展示，保留输入便于修正或重新读取最新版本。
   } finally {
     saving.value = false;
   }
@@ -196,9 +207,17 @@ function remove() {
   if (!folder) return;
   Modal.confirm({
     title: '删除文件夹',
+    okText: '删除',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
     content: `确认删除“${folder.name}”？仅空文件夹可以删除。`,
     async onOk() {
-      await deleteFolder(folder);
+      try {
+        await deleteFolder(folder);
+      } catch {
+        // 非空目录/版本冲突只显示接口提示并关闭确认框，不改变树和当前选中项。
+        return;
+      }
       message.success('文件夹已删除');
       await reload(folder.parentId ?? undefined);
     },
