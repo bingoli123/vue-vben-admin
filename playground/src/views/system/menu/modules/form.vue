@@ -13,6 +13,7 @@ import { schemaFor } from '../../shared/schema';
 const emit = defineEmits<{ success: [] }>();
 const current = ref<Row>();
 const ready = ref(false);
+let saved = false;
 const [Form, formApi] = useVbenForm({
   schema: schemaFor('menus'),
   showDefaultActions: false,
@@ -27,6 +28,7 @@ const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
   async onOpenChange(open) {
     if (!open) return;
     ready.value = false;
+    saved = false;
     drawerApi.setState({ loading: true, showConfirmButton: false });
     try {
       const data = drawerApi.getData();
@@ -54,6 +56,13 @@ const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
       drawerApi.setState({ loading: false });
     }
   },
+  onClosed() {
+    // 保存完成且抽屉关闭后再通知列表；取消或保存失败不刷新。
+    if (saved) {
+      saved = false;
+      emit('success');
+    }
+  },
   async onConfirm() {
     if (!ready.value) return;
     const validation = await formApi.validate();
@@ -61,8 +70,8 @@ const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
     drawerApi.lock();
     try {
       await saveRecord('menus', await formApi.getValues(), current.value);
-      emit('success');
-      drawerApi.close();
+      saved = true;
+      await drawerApi.close();
     } finally {
       drawerApi.unlock();
     }

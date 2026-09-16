@@ -58,7 +58,7 @@ onMounted(async () => {
 });
 function selectUnit(node: any) {
   selectedUnit.value = String(node.value?.id ?? '');
-  refresh();
+  void gridApi.reload();
 }
 
 const [Grid, gridApi] = useVbenVxeGrid({
@@ -94,6 +94,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
     },
   },
 });
+function reloadAfterSave() {
+  void gridApi.reload();
+}
 function refresh() {
   void gridApi.query();
 }
@@ -133,10 +136,6 @@ function actions(row: Row) {
       ifShow: !row.administrator || row.id === users.userInfo?.userId,
       onClick: () => edit(row),
     },
-  ];
-}
-function more(row: Row) {
-  return [
     {
       text: '分配角色',
       icon: 'lucide:users',
@@ -144,6 +143,10 @@ function more(row: Row) {
       ifShow: !row.administrator,
       onClick: () => grantsApi.setData({ kind: 'users', row }).open(),
     },
+  ];
+}
+function more(row: Row) {
+  return [
     {
       text: '重置密码',
       icon: 'lucide:key-round',
@@ -174,7 +177,7 @@ function more(row: Row) {
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="refresh" /><GrantsDrawer @success="refresh" />
+    <FormDrawer @success="reloadAfterSave" /><GrantsDrawer @success="refresh" />
     <DetailDrawer /><PasswordModal @success="refresh" />
     <Alert
       v-if="!queryAllowed"
@@ -188,7 +191,7 @@ function more(row: Row) {
           type="link"
           @click="
             selectedUnit = '';
-            refresh();
+            gridApi.reload();
           "
         >
           全部单位

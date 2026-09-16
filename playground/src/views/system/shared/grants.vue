@@ -154,7 +154,7 @@ const [Drawer, drawerApi] = useVbenDrawer<{
       :message="
         mode === 'users'
           ? '角色决定功能权限与单位范围；固定管理员身份不能通过角色赋予。'
-          : '功能权限逐项勾选；单位范围包含所选单位的有效下级。两组一起保存。'
+          : '功能权限父子联动：部分子项选中时上级半选，全部子项选中时上级全选；单位范围包含所选单位的有效下级。两组一起保存。'
       "
     />
     <template v-if="ready">
@@ -162,6 +162,7 @@ const [Drawer, drawerApi] = useVbenDrawer<{
         v-if="mode === 'users'"
         v-model="roles"
         :tree-data="roleTree"
+        select-all-label="全选角色"
         multiple
         check-strictly
         :auto-check-parent="false"
@@ -174,10 +175,11 @@ const [Drawer, drawerApi] = useVbenDrawer<{
           <Tree
             v-model="menus"
             :tree-data="menuTree"
+            select-all-label="全选功能权限"
             multiple
-            check-strictly
+            :check-strictly="false"
             :auto-check-parent="false"
-            :include-indeterminate="false"
+            include-indeterminate
             value-field="id"
             label-field="name"
             :default-expanded-level="2"
@@ -188,6 +190,7 @@ const [Drawer, drawerApi] = useVbenDrawer<{
           <Tree
             v-model="units"
             :tree-data="unitTree"
+            select-all-label="全选单位"
             multiple
             check-strictly
             :auto-check-parent="false"

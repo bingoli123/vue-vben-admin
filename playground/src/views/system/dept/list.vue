@@ -62,6 +62,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
     },
   },
 });
+function reloadAfterSave() {
+  void gridApi.reload();
+}
 function refresh() {
   void gridApi.query();
 }
@@ -128,7 +131,7 @@ function more(row: Row) {
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="refresh" />
+    <FormDrawer @success="reloadAfterSave" />
 
     <Alert
       v-if="!queryAllowed"

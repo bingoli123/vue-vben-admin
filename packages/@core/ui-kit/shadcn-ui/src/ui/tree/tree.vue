@@ -103,7 +103,8 @@ function updateTreeValue() {
       if (props.includeIndeterminate && props.multiple) {
         const excludedKeys = computeIndeterminateKeysInSelection(enabledIds);
         treeValue.value = enabledItems.filter(
-          (item) => !excludedKeys.has(get(item.value, props.valueField)),
+          // enabledItems 已是原始节点，不能再读取 item.value，否则半选节点会被误当成全选。
+          (item) => !excludedKeys.has(get(item, props.valueField)),
         );
       } else {
         treeValue.value = enabledItems;

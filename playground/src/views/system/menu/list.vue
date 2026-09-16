@@ -72,6 +72,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
     },
   },
 });
+function reloadAfterSave() {
+  void gridApi.reload();
+}
 function refresh() {
   void gridApi.query();
 }
@@ -99,22 +102,12 @@ function toggle(row: Row) {
 function actions(row: Row) {
   return [
     {
-      text: '编辑',
-      icon: 'lucide:edit',
-      auth: [permission(kind, 'edit', row)],
-      ifShow: !row.administrator || row.id === users.userInfo?.userId,
-      onClick: () => edit(row),
-    },
-  ];
-}
-function more(row: Row) {
-  return [
-    {
       text: '新增下级',
       icon: 'lucide:folder-plus',
       ifShow:
         row.menuType !== 'F' &&
-        (row.menuType !== 'C' || row.pageType === '普通页面'),
+        (row.menuType !== 'C' ||
+          (row.pageType === '普通页面' && row.url !== '/reports/designer')),
       auth: [
         permission(kind, 'add', {
           ...row,
@@ -129,6 +122,17 @@ function more(row: Row) {
           })
           .open(),
     },
+    {
+      text: '编辑',
+      icon: 'lucide:edit',
+      auth: [permission(kind, 'edit', row)],
+      ifShow: !row.administrator || row.id === users.userInfo?.userId,
+      onClick: () => edit(row),
+    },
+  ];
+}
+function more(row: Row) {
+  return [
     {
       text: row.enabled ? '停用' : '启用',
       icon: 'lucide:power',
@@ -152,7 +156,7 @@ function more(row: Row) {
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="refresh" />
+    <FormDrawer @success="reloadAfterSave" />
 
     <Alert
       v-if="!queryAllowed"
