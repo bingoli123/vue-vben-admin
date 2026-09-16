@@ -21,6 +21,17 @@ const node = (
   ...extra,
 });
 describe('后端菜单投影', () => {
+  it('人员入口使用独立干部页面且无权菜单不投影', () => {
+    const routes = navigationRoutes([
+      node('personnel', { url: '/cadre/personnel' }),
+      node('denied-personnel', { url: '/cadre/personnel', accessible: false }),
+    ]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({
+      component: '/cadre/personnel/list',
+      meta: { menuId: 'personnel' },
+    });
+  });
   it('编码规则仅为授权菜单生成入口', () => {
     const routes = navigationRoutes([
       node('numbering', { url: '/admin/code-rules' }),
