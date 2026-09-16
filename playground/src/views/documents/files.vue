@@ -5,6 +5,7 @@ import type { Folder } from '#/api/documents/folders';
 import { computed, reactive, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
+import { IconifyIcon } from '@vben/icons';
 
 import {
   Alert,
@@ -23,6 +24,7 @@ import {
 } from 'antdv-next';
 
 import {
+  deleteFile,
   downloadFile,
   filePermission,
   getFile,
@@ -156,6 +158,7 @@ watch(
   { immediate: true },
 );
 const downloading = ref<string[]>([]);
+const deleting = ref<string[]>([]);
 async function download(file: DocumentFile) {
   downloading.value.push(file.id);
   try {
@@ -165,6 +168,33 @@ async function download(file: DocumentFile) {
   } finally {
     downloading.value = downloading.value.filter((id) => id !== file.id);
   }
+}
+function remove(file: DocumentFile) {
+  Modal.confirm({
+    title: '删除文件',
+    okText: '删除',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
+    content: `确认删除“${file.name}”？原文件将被永久清理，不能恢复。`,
+    async onOk() {
+      deleting.value.push(file.id);
+      try {
+        await deleteFile(file);
+        if (detail.value?.id === file.id) {
+          ++detailRequest;
+          detailOpen.value = false;
+          detail.value = undefined;
+        }
+        message.success('文件已删除');
+        if (rows.value.length === 1 && pager.current > 1) pager.current -= 1;
+        await load();
+      } catch {
+        // 存储或元数据失败时服务端保留可重试状态，列表和详情保持原状。
+      } finally {
+        deleting.value = deleting.value.filter((id) => id !== file.id);
+      }
+    },
+  });
 }
 const columns = computed(() => [
   {
@@ -192,7 +222,7 @@ const columns = computed(() => [
   {
     title: '操作',
     key: 'actions',
-    width: can('download') ? 140 : 80,
+    width: 80 + (can('download') ? 60 : 0) + (can('delete') ? 60 : 0),
     fixed: 'right' as const,
   },
 ]);
@@ -244,7 +274,8 @@ const timeLabel = (value: string) => new Date(value).toLocaleString();
         <Space>
           <Button type="primary" html-type="submit" :loading="loading">
             查询文件
-</Button><Button :loading="loading" @click="load">刷新文件</Button>
+          </Button>
+          <Button :loading="loading" @click="load">刷新文件</Button>
         </Space>
       </Form>
       <Table
@@ -282,6 +313,16 @@ const timeLabel = (value: string) => new Date(value).toLocaleString();
               @click="download(record)"
             >
               下载
+            </Button>
+            <Button
+              v-if="can('delete')"
+              type="link"
+              danger
+              size="small"
+              :loading="deleting.includes(record.id)"
+              @click="remove(record)"
+            >
+              <IconifyIcon icon="lucide:trash-2" class="size-4" />删除
             </Button>
           </Space>
         </template>
@@ -333,6 +374,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString();
     :footer="null"
     :loading="detailLoading"
     :width="760"
+    destroy-on-hidden
   >
     <Descriptions v-if="detail" :column="2" bordered size="small" class="mt-4">
       <DescriptionsItem label="文件名称" :span="2">
@@ -370,14 +412,23 @@ const timeLabel = (value: string) => new Date(value).toLocaleString();
         {{ timeLabel(detail.updatedAt) }}
       </DescriptionsItem>
     </Descriptions>
-    <Button
-      v-if="detail && can('download')"
-      class="mt-4"
-      type="primary"
-      :loading="downloading.includes(detail.id)"
-      @click="download(detail)"
-    >
-      下载原文件
-    </Button>
+    <Space v-if="detail" class="mt-4">
+      <Button
+        v-if="can('download')"
+        type="primary"
+        :loading="downloading.includes(detail.id)"
+        @click="download(detail)"
+      >
+        下载原文件
+      </Button>
+      <Button
+        v-if="can('delete')"
+        danger
+        :loading="deleting.includes(detail.id)"
+        @click="remove(detail)"
+      >
+        <IconifyIcon icon="lucide:trash-2" class="size-4" />删除文件
+      </Button>
+    </Space>
   </Modal>
 </template>

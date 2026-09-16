@@ -50,6 +50,11 @@ export const uploadFile = (folderId: string, file: File, category: string) => {
     timeout: 120_000,
   });
 };
+export async function deleteFile(file: DocumentFile): Promise<void> {
+  await requestClient.delete(`${base}/${file.id}`, {
+    params: { version: file.version },
+  });
+}
 
 /** 真实鉴权流沿用会话客户端；失败响应不会被保存为损坏的附件。 */
 export async function downloadFile(file: DocumentFile) {

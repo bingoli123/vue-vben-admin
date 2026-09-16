@@ -6,6 +6,7 @@ import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  deleteFile,
   downloadFile,
   getFile,
   getFiles,
@@ -52,14 +53,20 @@ vi.mock('antdv-next', async () => {
   };
 });
 
-const permissions = vi.hoisted(() => new Set(['download', 'query', 'upload']));
+const permissions = vi.hoisted(
+  () => new Set(['delete', 'download', 'query', 'upload']),
+);
 vi.mock('@vben/access', () => ({
   useAccess: () => ({
     hasAccessByCodes: (codes: string[]) =>
       codes.some((c) => permissions.has(c.split(':').at(-1) ?? '')),
   }),
 }));
+vi.mock('@vben/icons', () => ({
+  IconifyIcon: { template: '<span />' },
+}));
 vi.mock('#/api/documents/files', () => ({
+  deleteFile: vi.fn(),
   getFile: vi.fn(),
   getFiles: vi.fn(),
   uploadFile: vi.fn(),
@@ -111,9 +118,14 @@ function button(label: string, root = new DOMWrapper(document.body)) {
       .find((b) => b.text().replaceAll(/\s/g, '') === label),
   );
 }
+function latestConfirm() {
+  const confirms =
+    document.body.querySelectorAll<HTMLElement>('.ant-modal-confirm');
+  return new DOMWrapper(required(confirms.item(confirms.length - 1)));
+}
 beforeEach(() => {
   permissions.clear();
-  ['query', 'upload', 'download'].forEach((p) => permissions.add(p));
+  ['query', 'upload', 'download', 'delete'].forEach((p) => permissions.add(p));
   vi.mocked(getFiles).mockImplementation(async (q) => ({
     records: [file(q.folderId)],
     total: 1,
@@ -122,6 +134,7 @@ beforeEach(() => {
   }));
   vi.mocked(getFile).mockImplementation(async (id) => file(id));
   vi.mocked(uploadFile).mockResolvedValue(file('1'));
+  vi.mocked(deleteFile).mockResolvedValue(undefined);
 });
 afterEach(() => {
   wrapper?.unmount();
@@ -218,5 +231,49 @@ describe('文档原文件交互', () => {
     await flushPromises();
     expect(downloadFile).toHaveBeenCalledWith(file('1'));
     expect(button('下载').attributes('disabled')).toBeUndefined();
+  });
+  it('删除独立授权，确认成功后刷新列表并关闭该文件详情', async () => {
+    wrapper = mount(Files, {
+      props: { folder: folder('1') },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await button('详情').trigger('click');
+    await flushPromises();
+    const before = vi.mocked(getFiles).mock.calls.length;
+    await button('删除').trigger('click');
+    await flushPromises();
+    await button('删除', latestConfirm()).trigger('click');
+    await flushPromises();
+    expect(deleteFile).toHaveBeenCalledWith(file('1'));
+    expect(getFiles).toHaveBeenCalledTimes(before + 1);
+    expect(document.body.textContent).not.toContain('文件详情');
+
+    wrapper.unmount();
+    document.body.innerHTML = '';
+    permissions.delete('delete');
+    wrapper = mount(Files, {
+      props: { folder: folder('1') },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('删除');
+  });
+  it('删除失败保留列表和详情，允许再次操作', async () => {
+    vi.mocked(deleteFile).mockRejectedValueOnce(new Error('存储不可用'));
+    wrapper = mount(Files, {
+      props: { folder: folder('1') },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await button('详情').trigger('click');
+    await flushPromises();
+    await button('删除').trigger('click');
+    await flushPromises();
+    await button('删除', latestConfirm()).trigger('click');
+    await flushPromises();
+    expect(document.body.textContent).toContain('文件详情');
+    expect(wrapper.text()).toContain('原文件1.txt');
+    expect(button('删除').attributes('disabled')).toBeUndefined();
   });
 });
