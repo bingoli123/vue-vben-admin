@@ -21,6 +21,24 @@ const items = computed(() => [
   { label: '手机号', content: data.value?.phone ?? '未配置' },
   { label: '职务', content: data.value?.position ?? '未配置' },
   { label: '序号', content: data.value?.sortOrder ?? '未配置' },
+  { label: '状态', content: data.value?.enabled ? '有效' : '无效' },
+  {
+    label: '下井指标（次）',
+    content: data.value?.undergroundCount ?? '未配置',
+  },
+  { label: '下现场指标（次）', content: data.value?.onsiteCount ?? '未配置' },
+  { label: '盯班指标（次）', content: data.value?.watchDutyCount ?? '未配置' },
+  {
+    label: '停止作业指标（次）',
+    content: data.value?.stopWorkCount ?? '未配置',
+  },
+  { label: 'D 卡指标（个）', content: data.value?.dCardCount ?? '未配置' },
+  { label: '罚款指标（元）', content: data.value?.penaltyAmount ?? '未配置' },
+  {
+    label: '安全工资标准（元）',
+    content: data.value?.safetySalary ?? '未配置',
+  },
+  { label: '工资系数', content: data.value?.salaryCoefficient ?? '未配置' },
   { label: '版本', content: data.value?.version },
   { label: '创建人', content: data.value?.createdBy },
   {

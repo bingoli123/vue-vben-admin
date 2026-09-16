@@ -8,10 +8,11 @@ import { useAccess } from '@vben/access';
 import { Page, Tree, useVbenDrawer } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 
-import { Alert, Button, Card } from 'antdv-next';
+import { Alert, Button, Card, message, Modal, Tag } from 'antdv-next';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import {
+  changePersonnelStatus,
   getPersonnelList,
   getPersonnelUnits,
   personnelPermission,
@@ -82,6 +83,18 @@ function selectUnit(node: { value?: { id?: string } }) {
 function refresh() {
   void gridApi.reload();
 }
+function toggleStatus(row: Personnel) {
+  Modal.confirm({
+    title: '修改人员状态',
+    content: `确认将 ${row.name} 设为${row.enabled ? '无效' : '有效'}？`,
+    async onOk() {
+      const updated = await changePersonnelStatus(row);
+      Object.assign(row, updated);
+      message.success(updated.enabled ? '人员已设为有效' : '人员已设为无效');
+      refresh();
+    },
+  });
+}
 function actions(row: Personnel) {
   return [
     {
@@ -94,6 +107,12 @@ function actions(row: Personnel) {
       icon: 'lucide:edit',
       auth: [personnelPermission('edit')],
       onClick: () => formApi.setData({ id: row.id }).open(),
+    },
+    {
+      text: row.enabled ? '设为无效' : '设为有效',
+      icon: 'lucide:power',
+      auth: [personnelPermission('status')],
+      onClick: () => toggleStatus(row),
     },
   ];
 }
@@ -142,6 +161,11 @@ function actions(row: Personnel) {
           </template>
           <template #action="{ row }">
             <VbenTableAction :actions="actions(row as Personnel)" />
+          </template>
+          <template #state="{ row }">
+            <Tag :color="row.enabled ? 'success' : 'default'">
+              {{ row.enabled ? '有效' : '无效' }}
+            </Tag>
           </template>
         </Grid>
       </div>

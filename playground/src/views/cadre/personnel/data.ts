@@ -29,11 +29,17 @@ export function columns(): VxeTableGridColumns<Personnel> {
     { field: 'phone', title: '手机号', minWidth: 140 },
     { field: 'position', title: '职务', minWidth: 110 },
     { field: 'sortOrder', title: '序号', width: 80 },
+    {
+      field: 'enabled',
+      title: '状态',
+      width: 90,
+      slots: { default: 'state' },
+    },
     { field: 'version', title: '版本', width: 80 },
     {
       field: 'operation',
       title: '操作',
-      width: 140,
+      width: 220,
       fixed: 'right',
       slots: { default: 'action' },
     },

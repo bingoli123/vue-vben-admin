@@ -14,6 +14,14 @@ export interface Personnel {
   phone: null | string;
   position: null | string;
   sortOrder: null | number;
+  undergroundCount: null | number;
+  onsiteCount: null | number;
+  watchDutyCount: null | number;
+  stopWorkCount: null | number;
+  dCardCount: null | number;
+  penaltyAmount: null | string;
+  safetySalary: null | string;
+  salaryCoefficient: null | string;
   enabled: boolean;
   version: number;
   createdBy: string;
@@ -29,6 +37,13 @@ export const getPersonnelUnits = () =>
   requestClient.get<Option[]>('/cadre/personnel/units');
 export const suggestInitials = (name: string) =>
   requestClient.get<string>('/cadre/personnel/initials', { params: { name } });
+export const changePersonnelStatus = (
+  record: Pick<Personnel, 'enabled' | 'id' | 'version'>,
+) =>
+  requestClient.request<Personnel>(`/cadre/personnel/${record.id}/status`, {
+    method: 'PATCH',
+    data: { enabled: !record.enabled, version: record.version },
+  });
 export async function getPersonnelList(params: Record<string, unknown> = {}) {
   const filtered = Object.fromEntries(
     Object.entries(params).filter(
@@ -41,7 +56,7 @@ export async function getPersonnelList(params: Record<string, unknown> = {}) {
   );
   return { items: result.records, total: result.total };
 }
-/** 编号、规则ID、状态、身份及审计均不可回写；空文本保存NULL，序号0原样保留。 */
+/** 编号、状态及审计不可随资料回写；空值保存NULL，数值0原样保留。 */
 export function savePersonnel(
   values: Record<string, unknown>,
   existing?: Pick<Personnel, 'id' | 'version'>,
@@ -54,6 +69,14 @@ export function savePersonnel(
     'phone',
     'position',
     'sortOrder',
+    'undergroundCount',
+    'onsiteCount',
+    'watchDutyCount',
+    'stopWorkCount',
+    'dCardCount',
+    'penaltyAmount',
+    'safetySalary',
+    'salaryCoefficient',
   ];
   const body = Object.fromEntries(
     fields.map((key) => [

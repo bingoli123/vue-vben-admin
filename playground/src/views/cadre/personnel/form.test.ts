@@ -27,6 +27,7 @@ vi.mock('#/api/system/admin', () => ({ asTree: (items: unknown[]) => items }));
 vi.mock('antdv-next', () => ({
   Alert: { render: () => null },
   Button: { render: () => null },
+  Divider: { render: () => null },
   Form: { render: () => null },
   FormItem: { render: () => null },
   Input: { render: () => null },

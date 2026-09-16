@@ -64,7 +64,7 @@ async function openPersonnel(page: Page, headers: Record<string, string>) {
   await page.goto(`/menus/${menu.id}`);
 }
 
-test('管理员维护独立人员，自动编号、简拼、重复手机修正及空值往返', async ({
+test('管理员维护人员基础资料、当前指标、有效状态及空值往返', async ({
   page,
 }, info) => {
   const { username, password } = credentials();
@@ -81,9 +81,15 @@ test('管理员维护独立人员，自动编号、简拼、重复手机修正�
   });
   expect(outside.ok()).toBeTruthy();
   const name = `张三验收${Date.now()}`;
+  const phone = `139${String(Date.now()).slice(-8)}`;
   const dialog = page.getByRole('dialog');
   const confirm = () =>
     dialog.getByRole('button', { name: /^确\s*认$/ }).click();
+  const numberInput = (label: string) =>
+    dialog
+      .locator('.ant-form-item')
+      .filter({ hasText: label })
+      .getByRole('spinbutton');
   const create = async () => {
     await page.getByRole('button', { name: '新增人员', exact: true }).click();
     await expect(
@@ -119,31 +125,77 @@ test('管理员维护独立人员，自动编号、简拼、重复手机修正�
   expect(first.number).toMatch(/^RY[0-9]{6}$/);
   expect(first.phone).toBeNull();
   expect(first.sortOrder).toBeNull();
-  await page.getByRole('button', { name: '详情', exact: true }).click();
+  await page.getByRole('button', { name: '详情', exact: true }).first().click();
   await expect(dialog.getByText(first.number, { exact: true })).toBeVisible();
   await expect(dialog).toContainText('未配置');
   await dialog.getByRole('button').first().click();
   await expect(dialog).not.toBeVisible();
-  await page.getByRole('button', { name: /^编\s*辑$/ }).click();
+  await page
+    .getByRole('button', { name: /^编\s*辑$/ })
+    .first()
+    .click();
   await expect(dialog.getByRole('button', { name: /^确\s*认$/ })).toBeVisible();
   await expect(dialog.getByPlaceholder('保存后自动生成')).toHaveValue(
     first.number,
   );
   await dialog.getByPlaceholder('自动生成，可按实际读音修正').fill('CUSTOM');
   await dialog.getByPlaceholder('选填，独立于人员编号').fill('重复工号');
-  await dialog
-    .getByPlaceholder('选填，填写后不能与其他人员重复')
-    .fill('13800005505');
+  await dialog.getByPlaceholder('选填，填写后不能与其他人员重复').fill(phone);
   await dialog.getByPlaceholder('请输入职务（选填）').fill('主任');
-  await dialog.getByRole('spinbutton').fill('0');
+  await numberInput('序号').fill('0');
+  await numberInput('下井指标（次）').fill('0');
+  await numberInput('下现场指标（次）').fill('12');
+  await numberInput('盯班指标（次）').fill('3');
+  await numberInput('停止作业指标（次）').fill('0');
+  await numberInput('D 卡指标（个）').fill('5');
+  await numberInput('罚款指标（元）').fill('123.40');
+  await numberInput('安全工资标准（元）').fill('0.00');
+  await numberInput('工资系数').fill('0.1250');
   await confirm();
   await expect(dialog).not.toBeVisible();
   await expect(rows).toContainText('CUSTOM');
+  const withTargets = await page.request.get(
+    `/api/cadre/personnel/${first.id}`,
+    { headers },
+  );
+  const targetBody = await withTargets.json();
+  const targetData = targetBody.data;
+  expect(targetData).toMatchObject({
+    undergroundCount: 0,
+    onsiteCount: 12,
+    watchDutyCount: 3,
+    stopWorkCount: 0,
+    dCardCount: 5,
+    penaltyAmount: '123.40',
+    safetySalary: '0.00',
+    salaryCoefficient: '0.1250',
+  });
+  await page
+    .getByRole('button', { name: '设为无效', exact: true })
+    .first()
+    .click();
+  const statusRequest = page.waitForResponse(
+    (r) =>
+      r.request().method() === 'PATCH' &&
+      r.url().endsWith(`/cadre/personnel/${first.id}/status`),
+  );
+  await page.getByRole('button', { name: 'OK', exact: true }).click();
+  const statusResponse = await statusRequest;
+  expect(statusResponse.ok()).toBeTruthy();
+  await expect(rows.first()).toContainText('无效');
+  await page.getByRole('button', { name: '详情', exact: true }).first().click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('123.40');
+  await expect(dialog).toContainText('0.1250');
+  await expect(dialog).toContainText('无效');
+  await dialog.screenshot({
+    path: info.outputPath('personnel-targets-status.png'),
+  });
+  await dialog.getByRole('button').first().click();
+  await expect(dialog).not.toBeVisible();
   await create();
   await dialog.getByPlaceholder('选填，独立于人员编号').fill('重复工号');
-  await dialog
-    .getByPlaceholder('选填，填写后不能与其他人员重复')
-    .fill('13800005505');
+  await dialog.getByPlaceholder('选填，填写后不能与其他人员重复').fill(phone);
   const conflict = page.waitForResponse(
     (r) =>
       r.request().method() === 'POST' && r.url().endsWith('/cadre/personnel'),
@@ -160,15 +212,28 @@ test('管理员维护独立人员，自动编号、简拼、重复手机修正�
   await page.getByPlaceholder('搜索人员编号').fill(first.number);
   await page.getByRole('button', { name: /^搜\s*索$/ }).click();
   await expect(rows).toHaveCount(1);
-  await page.getByRole('button', { name: /^编\s*辑$/ }).click();
+  await page
+    .getByRole('button', { name: /^编\s*辑$/ })
+    .first()
+    .click();
   await expect(
     dialog.getByPlaceholder('自动生成，可按实际读音修正'),
   ).toHaveValue('CUSTOM');
-  await expect(dialog.getByRole('spinbutton')).toHaveValue('0');
+  await expect(numberInput('序号')).toHaveValue('0');
+  await expect(numberInput('下井指标（次）')).toHaveValue('0');
+  await expect(numberInput('下现场指标（次）')).toHaveValue('12');
   await dialog.getByPlaceholder('选填，独立于人员编号').fill('');
   await dialog.getByPlaceholder('选填，填写后不能与其他人员重复').fill('');
   await dialog.getByPlaceholder('请输入职务（选填）').fill('');
-  await dialog.getByRole('spinbutton').fill('');
+  await numberInput('序号').fill('');
+  await numberInput('下井指标（次）').fill('0');
+  await numberInput('下现场指标（次）').fill('');
+  await numberInput('盯班指标（次）').fill('');
+  await numberInput('停止作业指标（次）').fill('');
+  await numberInput('D 卡指标（个）').fill('');
+  await numberInput('罚款指标（元）').fill('0');
+  await numberInput('安全工资标准（元）').fill('');
+  await numberInput('工资系数').fill('0.0000');
   await confirm();
   await expect(dialog).not.toBeVisible();
   const read = await page.request.get(`/api/cadre/personnel/${first.id}`, {
@@ -177,6 +242,20 @@ test('管理员维护独立人员，自动编号、简拼、重复手机修正�
   const current = await read.json();
   for (const key of ['phone', 'employeeNo', 'position', 'sortOrder'])
     expect(current.data[key]).toBeNull();
+  for (const key of [
+    'onsiteCount',
+    'watchDutyCount',
+    'stopWorkCount',
+    'dCardCount',
+    'safetySalary',
+  ])
+    expect(current.data[key]).toBeNull();
+  expect(current.data).toMatchObject({
+    undergroundCount: 0,
+    penaltyAmount: '0.00',
+    salaryCoefficient: '0.0000',
+    enabled: false,
+  });
   expect(current.data.number).toBe(first.number);
   expect(current.data.initials).toBe('CUSTOM');
   await page.getByPlaceholder('搜索名称简拼').fill('custom');
