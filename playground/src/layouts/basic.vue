@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 
 import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
 import { useWatermark } from '@vben/hooks';
-import { BasicLayout, LockScreen, UserDropdown } from '@vben/layouts';
+import { BasicLayout, UserDropdown } from '@vben/layouts';
 import { preferences, usePreferences } from '@vben/preferences';
 import { useAccessStore, useTabbarStore, useUserStore } from '@vben/stores';
 
@@ -118,9 +118,6 @@ onBeforeMount(() => {
       >
         <LoginForm />
       </AuthenticationLoginExpiredModal>
-    </template>
-    <template #lock-screen>
-      <LockScreen :avatar @to-login="handleLogout" />
     </template>
   </BasicLayout>
 </template>

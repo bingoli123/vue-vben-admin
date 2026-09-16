@@ -5,6 +5,7 @@ import { onMounted, onUnmounted, ref, unref } from 'vue';
 
 import { onSupportLanguagesChange } from '@vben/constants';
 import { $t } from '@vben/locales';
+import { preferences } from '@vben/preferences';
 import { useTimezoneStore } from '@vben/stores';
 
 import InputItem from '../input-item.vue';
@@ -40,6 +41,7 @@ const timezoneOptionsRef = ref<
 >([]);
 
 onMounted(async () => {
+  if (!preferences.widget.timezone) return;
   timezoneOptionsRef.value = await timezoneStore.getTimezoneOptions();
   // 获取当前时区，例如：Asia/Shanghai
   const timezoneValue = unref(timezoneStore.timezone);
@@ -50,10 +52,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SelectItem v-model="appLocale" :items="languageList">
+  <SelectItem
+    v-if="preferences.widget.languageToggle"
+    v-model="appLocale"
+    :items="languageList"
+  >
     {{ $t('preferences.language') }}
   </SelectItem>
-  <SelectItem v-model="appTimezone" :items="timezoneOptionsRef">
+  <SelectItem
+    v-if="preferences.widget.timezone"
+    v-model="appTimezone"
+    :items="timezoneOptionsRef"
+  >
     {{ $t('preferences.timezone') }}
   </SelectItem>
   <SwitchItem v-model="appDynamicTitle">

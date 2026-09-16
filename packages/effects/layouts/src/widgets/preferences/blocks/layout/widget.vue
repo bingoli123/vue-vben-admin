@@ -4,6 +4,7 @@ import type { PreferencesButtonPositionType, SelectOption } from '@vben/types';
 import { computed } from 'vue';
 
 import { $t } from '@vben/locales';
+import { preferences } from '@vben/preferences';
 
 import DraggableList from '../draggable-list.vue';
 
@@ -113,15 +114,24 @@ const labelMap: Record<string, string> = {
   logoutBtn: 'common.logout',
 };
 
-const draggableItems = computed(() =>
-  (widgetOrder.value ?? []).map((key) => ({
-    key,
-    label: $t(labelMap[key] ?? key),
-    position: getPosition(key),
-    positionItems:
-      key === 'preferences' ? preferencesPositionItems.value : undefined,
-  })),
-);
+const draggableItems = computed(() => {
+  const enabled: Record<string, boolean> = {
+    globalSearch: preferences.widget.globalSearch,
+    languageToggle: preferences.widget.languageToggle,
+    timezone: preferences.widget.timezone,
+    notification: preferences.widget.notification,
+    lockScreenBtn: preferences.widget.lockScreen,
+  };
+  return (widgetOrder.value ?? [])
+    .filter((key) => enabled[key] !== false)
+    .map((key) => ({
+      key,
+      label: $t(labelMap[key] ?? key),
+      position: getPosition(key),
+      positionItems:
+        key === 'preferences' ? preferencesPositionItems.value : undefined,
+    }));
+});
 
 function getPosition(
   key: string,
