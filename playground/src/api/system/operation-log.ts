@@ -43,6 +43,13 @@ export const operationTypes = [
   { label: '导出', value: 'EXPORT' },
   { label: '删除', value: 'DELETE' },
   { label: '清空', value: 'CLEAR' },
+  { label: '状态变更', value: 'STATUS' },
+  { label: '授权', value: 'AUTHORIZE' },
+  { label: '改密', value: 'PASSWORD' },
+  { label: '刷新', value: 'REFRESH' },
+  { label: '取号', value: 'ISSUE' },
+  { label: '上传', value: 'UPLOAD' },
+  { label: '下载', value: 'DOWNLOAD' },
 ];
 export const deviceTypes = [
   { label: '电脑', value: 'PC' },
