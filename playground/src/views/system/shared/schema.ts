@@ -41,8 +41,8 @@ const enabled: Field = {
   defaultValue: true,
   componentProps: {
     options: [
-      { label: '有效', value: true },
-      { label: '无效', value: false },
+      { label: '已启用', value: true },
+      { label: '已禁用', value: false },
     ],
     optionType: 'button',
     buttonStyle: 'solid',
@@ -58,6 +58,7 @@ const sort: Field = {
 };
 const description: Field = {
   component: 'Textarea',
+  formItemClass: 'col-span-full',
   fieldName: 'description',
   label: '说明',
   componentProps: { maxlength: 1000 },
@@ -102,7 +103,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
     return [
       input('code', '角色编码', 64, true),
       input('name', '角色名称', 200, true),
-      input('unitName', '所属单位（说明）'),
+      { ...input('unitName', '所属单位'), help: '角色所属单位的文字说明' },
       input('roleType', '角色类型', 64),
       sort,
       status,
@@ -112,15 +113,34 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
     return [
       input('username', '账号', 64, true),
       input('name', '姓名'),
-      input('employeeNo', '工号', 64),
-      input('fullPinyin', '全拼'),
       {
-        component: 'AutoComplete',
+        ...input('phone', '手机号', 32, true),
+        rules:
+          existing && !existing.phone
+            ? z
+                .string()
+                .trim()
+                .regex(/^1[3-9]\d{9}$/, '请输入正确的11位手机号')
+                .optional()
+                .or(z.literal(''))
+                .nullable()
+            : z
+                .string()
+                .trim()
+                .regex(/^1[3-9]\d{9}$/, '请输入正确的11位手机号'),
+      },
+      input('employeeNo', '工号', 64),
+      {
+        component: 'Select',
         fieldName: 'gender',
         label: '性别',
         componentProps: {
-          options: [{ value: '男' }, { value: '女' }],
-          maxlength: 32,
+          options: [
+            { label: '男', value: '男' },
+            { label: '女', value: '女' },
+          ],
+          placeholder: '请选择性别',
+          allowClear: true,
         },
       },
       {
@@ -130,6 +150,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
         rules: 'required',
         componentProps: {
           api: async () => asTree(await unitOptions()),
+          placeholder: '请选择所属单位',
           labelField: 'name',
           valueField: 'id',
           childrenField: 'children',
@@ -137,7 +158,6 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
           treeDefaultExpandAll: true,
         },
       },
-      input('attendanceNo', '考勤号', 64),
       ...(existing
         ? []
         : [
@@ -228,14 +248,13 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
     ...[
       ['icon', '图标'],
       ['activeIcon', '激活图标'],
-      ['shortcutIcon', '快捷图标'],
     ].map(
       ([fieldName, label]) =>
         ({
           component: 'IconPicker',
           fieldName: fieldName ?? '',
           label,
-          componentProps: { prefix: 'lucide' },
+          componentProps: { prefix: 'lucide', autoFetchApi: false },
           dependencies: nonButton,
         }) as VbenFormSchema,
     ),
@@ -261,14 +280,14 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
       component: 'Divider',
       fieldName: 'advanced',
       hideLabel: true,
-      formItemClass: 'col-span-2',
+      formItemClass: 'col-span-full',
       renderComponentContent: () => ({
         default: () => '高级设置（暂未支持保存，只读）',
       }),
     },
     ...[
       ['activePath', '激活路径'],
-      ['linkSrc', '外链 / 内嵌地址'],
+      ['linkSrc', '链接地址'],
       ['badge', '徽标'],
     ].map(
       ([fieldName, label]) =>

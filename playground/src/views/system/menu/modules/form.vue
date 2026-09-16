@@ -6,6 +6,7 @@ import { computed, nextTick, ref } from 'vue';
 import { useVbenDrawer } from '@vben/common-ui';
 
 import { useVbenForm } from '#/adapter/form';
+import { menuIcon } from '#/api/core/menu';
 import { getDetail, saveRecord } from '#/api/system/admin';
 
 import { schemaFor } from '../../shared/schema';
@@ -15,8 +16,12 @@ const ready = ref(false);
 const [Form, formApi] = useVbenForm({
   schema: schemaFor('menus'),
   showDefaultActions: false,
-  commonConfig: { formItemClass: 'col-span-2 md:col-span-1' },
-  wrapperClass: 'grid-cols-2 gap-x-4',
+  commonConfig: {
+    componentProps: { class: 'w-full' },
+    labelWidth: 112,
+    labelClass: 'whitespace-nowrap',
+  },
+  wrapperClass: 'grid-cols-1 md:grid-cols-2 gap-x-6',
 });
 const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
   async onOpenChange(open) {
@@ -26,6 +31,10 @@ const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
     try {
       const data = drawerApi.getData();
       current.value = data?.id ? await getDetail('menus', data.id) : undefined;
+      if (current.value) {
+        current.value.icon = menuIcon(current.value.icon);
+        current.value.activeIcon = menuIcon(current.value.activeIcon);
+      }
       await formApi.reset();
       formApi.setState({ schema: schemaFor('menus', current.value) });
       await nextTick();

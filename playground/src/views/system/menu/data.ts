@@ -12,8 +12,7 @@ export function useColumns(): VxeTableGridColumns {
       field: 'menuType',
       title: '类型',
       width: 90,
-      formatter: ({ cellValue }) =>
-        ({ M: '目录', C: '菜单', F: '按钮' })[cellValue as 'C' | 'F' | 'M'],
+      slots: { default: 'menuType' },
     },
     { field: 'code', title: '菜单编码', minWidth: 140 },
     { field: 'perms', title: '权限标识', minWidth: 140 },

@@ -37,6 +37,8 @@ export interface TreeProps {
   multiple?: boolean;
   /** 选择全部时的文字 */
   selectAllLabel?: string;
+  /** 是否显示顶部展开/收缩工具栏 */
+  showToolbar?: boolean;
   /** 显示由iconField指定的图标 */
   showIcon?: boolean;
   /** 启用展开收缩动画 */
@@ -60,6 +62,7 @@ export function treePropsDefaults() {
     iconField: 'icon',
     labelField: 'label',
     multiple: false,
+    showToolbar: true,
     showIcon: true,
     transition: true,
     includeIndeterminate: false,

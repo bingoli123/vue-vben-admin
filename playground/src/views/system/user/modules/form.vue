@@ -15,8 +15,12 @@ const ready = ref(false);
 const [Form, formApi] = useVbenForm({
   schema: schemaFor('users'),
   showDefaultActions: false,
-  commonConfig: { formItemClass: 'col-span-2 md:col-span-1' },
-  wrapperClass: 'grid-cols-2 gap-x-4',
+  commonConfig: {
+    componentProps: { class: 'w-full' },
+    labelWidth: 112,
+    labelClass: 'whitespace-nowrap',
+  },
+  wrapperClass: 'grid-cols-1 md:grid-cols-2 gap-x-6',
 });
 const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
   async onOpenChange(open) {
@@ -29,16 +33,7 @@ const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
       await formApi.reset();
       formApi.setState({ schema: schemaFor('users', current.value) });
       await nextTick();
-      await formApi.setValues(
-        current.value ?? {
-          enabled: true,
-          sortOrder: 0,
-          menuType: data?.menuType || 'C',
-          pageType: '普通页面',
-          platformType: '管理端',
-          ...data,
-        },
-      );
+      await formApi.setValues(current.value ?? { unitId: data?.unitId });
       ready.value = true;
       drawerApi.setState({ showConfirmButton: true });
     } finally {

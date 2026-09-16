@@ -3,6 +3,7 @@ export function useColumns(): VxeTableGridColumns {
   return [
     { field: 'username', title: '账号', minWidth: 140 },
     { field: 'name', title: '姓名', minWidth: 180 },
+    { field: 'phone', title: '手机号', minWidth: 140 },
     { field: 'employeeNo', title: '工号', minWidth: 140 },
     { field: 'gender', title: '性别', minWidth: 140 },
     { field: 'unitName', title: '所属单位', minWidth: 140 },

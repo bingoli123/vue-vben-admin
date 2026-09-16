@@ -144,8 +144,8 @@ function more(row: Row) {
         </Button>
       </template>
       <template #state="{ row }">
-        <Tag :color="row.enabled ? 'success' : 'default'">
-          {{ row.enabled ? '有效' : '无效' }}
+        <Tag :color="row.enabled ? 'success' : 'error'">
+          {{ row.enabled ? '已启用' : '已禁用' }}
         </Tag>
       </template>
       <template #action="{ row }">

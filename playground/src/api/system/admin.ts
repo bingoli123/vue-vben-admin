@@ -47,6 +47,7 @@ const fields: Record<Kind, string[]> = {
   users: [
     'username',
     'name',
+    'phone',
     'employeeNo',
     'fullPinyin',
     'gender',
@@ -74,7 +75,6 @@ const fields: Record<Kind, string[]> = {
     'reportFile',
     'icon',
     'activeIcon',
-    'shortcutIcon',
     'resourceType',
     'operationType',
     'sortOrder',
@@ -109,7 +109,13 @@ export async function saveRecord(
   const body: Record<string, any> = Object.fromEntries(
     fields[kind].map((key) => [key, values[key] === '' ? null : values[key]]),
   );
-  if (existing) body.version = existing.version;
+  if (existing) {
+    body.version = existing.version;
+    // 简化表单不覆盖历史全拼、考勤号或快捷图标。
+    const preserved = kind === 'users' ? ['fullPinyin', 'attendanceNo'] : [];
+    for (const key of preserved) body[key] = existing[key];
+    if (kind === 'menus') body.shortcutIcon = existing.shortcutIcon;
+  }
   if (kind === 'users' && !existing) {
     const { keyId, encrypted } = await encryptPasswords(values.password);
     Object.assign(body, { keyId, encryptedPassword: encrypted[0] });

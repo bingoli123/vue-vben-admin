@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { Kind, Row } from '#/api/system/admin';
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page, useVbenDrawer } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 import { useUserStore } from '@vben/stores';
 
-import { Alert, Button, message, Modal, Tag } from 'antdv-next';
+import { Alert, Button, message, Modal, Switch } from 'antdv-next';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import {
@@ -84,12 +84,23 @@ async function remove(row: Row) {
   message.success('已删除');
   refresh();
 }
+const changingStatus = ref(new Set<string>());
 function toggle(row: Row) {
+  if (
+    !can(permission(kind, 'status', row)) ||
+    row.administrator ||
+    changingStatus.value.has(row.id)
+  )
+    return;
+  changingStatus.value.add(row.id);
   Modal.confirm({
     title: '修改状态',
-    content: `确认${row.enabled ? '停用' : '启用'}${row.name || row.username}？`,
+    content: `确认${row.enabled ? '禁用' : '启用'}${row.name || row.username}？`,
+    afterClose: () => changingStatus.value.delete(row.id),
     async onOk() {
-      await changeStatus(kind, row);
+      const updated = await changeStatus(kind, row);
+      Object.assign(row, updated);
+      message.success(updated.enabled ? '已启用' : '已禁用');
       refresh();
     },
   });
@@ -113,13 +124,6 @@ function actions(row: Row) {
 }
 function more(row: Row) {
   return [
-    {
-      text: row.enabled ? '停用' : '启用',
-      icon: 'lucide:power',
-      auth: [permission(kind, 'status', row)],
-      ifShow: !row.administrator,
-      onClick: () => toggle(row),
-    },
     {
       text: '删除',
       icon: 'lucide:trash-2',
@@ -152,9 +156,16 @@ function more(row: Row) {
         </Button>
       </template>
       <template #state="{ row }">
-        <Tag :color="row.enabled ? 'success' : 'default'">
-          {{ row.enabled ? '有效' : '无效' }}
-        </Tag>
+        <Switch
+          :checked="row.enabled"
+          checked-children="已启用"
+          un-checked-children="已禁用"
+          :disabled="
+            !!row.administrator || !can(permission(kind, 'status', row as Row))
+          "
+          :loading="changingStatus.has(row.id)"
+          @change="() => toggle(row as Row)"
+        />
       </template>
       <template #action="{ row }">
         <VbenTableAction

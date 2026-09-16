@@ -30,6 +30,7 @@
     "#/*": "./src/*"
   },
   "dependencies": {
+    "@iconify-json/lucide": "catalog:",
     "@tanstack/vue-query": "catalog:",
     "@vben-core/design": "workspace:*",
     "@vben-core/menu-ui": "workspace:*",
@@ -58,6 +59,8 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "@types/json-bigint": "catalog:"
+    "@types/json-bigint": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vue/test-utils": "catalog:"
   }
 }

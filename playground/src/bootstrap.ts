@@ -17,8 +17,10 @@ import { router } from '#/router';
 import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm, useVbenForm } from './adapter/form';
 import App from './app.vue';
+import { registerAppIcons } from './icons';
 
 async function bootstrap(namespace: string) {
+  registerAppIcons();
   // 演示扩展语言：d.ts 模块增强已向 SupportedLanguages 注册表追加 zh-TW
   // （见 src/locales/languages.d.ts），此处同步注册运行时语言列表，
   // 语言切换组件即可显示三语

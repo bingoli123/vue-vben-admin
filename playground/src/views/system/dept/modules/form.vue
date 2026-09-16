@@ -15,8 +15,12 @@ const ready = ref(false);
 const [Form, formApi] = useVbenForm({
   schema: schemaFor('units'),
   showDefaultActions: false,
-  commonConfig: { formItemClass: 'col-span-2 md:col-span-1' },
-  wrapperClass: 'grid-cols-2 gap-x-4',
+  commonConfig: {
+    componentProps: { class: 'w-full' },
+    labelWidth: 112,
+    labelClass: 'whitespace-nowrap',
+  },
+  wrapperClass: 'grid-cols-1 md:grid-cols-2 gap-x-6',
 });
 const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
   async onOpenChange(open) {

@@ -24,6 +24,46 @@ vi.mock('#/api/core/auth', () => ({
 
 describe('管理接口契约', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('手机号写入新增请求，工号可缺省，密码仍只发送密文', async () => {
+    await saveRecord('users', {
+      username: 'tester',
+      name: '测试',
+      phone: '13800000000',
+      unitId: '1',
+      password: 'Password1!',
+    });
+    const [, body] = request.post.mock.calls[0] ?? [];
+    expect(body).toMatchObject({
+      phone: '13800000000',
+      keyId: 'key',
+      encryptedPassword: 'cipher',
+    });
+    expect(body.employeeNo).toBeUndefined();
+    expect(body).not.toHaveProperty('password');
+  });
+  it('简化用户编辑表单保留数据库中的全拼和考勤号', async () => {
+    await saveRecord(
+      'users',
+      { username: 'tester', phone: '13900000000', employeeNo: '0007' },
+      {
+        id: '1',
+        name: '测试',
+        version: 2,
+        fullPinyin: 'ceshi',
+        attendanceNo: '0088',
+      },
+    );
+    expect(request.put).toHaveBeenCalledWith(
+      '/admin/users/1',
+      expect.objectContaining({
+        phone: '13900000000',
+        employeeNo: '0007',
+        fullPinyin: 'ceshi',
+        attendanceNo: '0088',
+        version: 2,
+      }),
+    );
+  });
   it('仅提交后端白名单字段，编辑携带读取版本，不提交只读高级设置', async () => {
     await saveRecord(
       'menus',

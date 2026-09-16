@@ -23,6 +23,11 @@ import { useColumns } from './data';
 import Form from './modules/form.vue';
 
 const kind: Kind = 'menus';
+const menuTypes = {
+  M: { label: '目录', color: 'blue' },
+  C: { label: '菜单', color: 'default' },
+  F: { label: '按钮', color: 'purple' },
+};
 const { hasAccessByCodes: canCodes } = useAccess();
 const users = useUserStore();
 const can = (code: string) => canCodes([code]);
@@ -157,6 +162,11 @@ function more(row: Row) {
     />
 
     <Grid table-title="菜单管理">
+      <template #menuType="{ row }">
+        <Tag :color="menuTypes[row.menuType as keyof typeof menuTypes]?.color">
+          {{ menuTypes[row.menuType as keyof typeof menuTypes]?.label }}
+        </Tag>
+      </template>
       <template #name="{ row }">
         <span class="inline-flex items-center gap-2"><IconifyIcon
             v-if="row.icon"
@@ -170,8 +180,8 @@ function more(row: Row) {
         </Button>
       </template>
       <template #state="{ row }">
-        <Tag :color="row.enabled ? 'success' : 'default'">
-          {{ row.enabled ? '有效' : '无效' }}
+        <Tag :color="row.enabled ? 'success' : 'error'">
+          {{ row.enabled ? '已启用' : '已禁用' }}
         </Tag>
       </template>
       <template #action="{ row }">

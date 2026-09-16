@@ -98,7 +98,7 @@ function refresh() {
   void gridApi.query();
 }
 function create() {
-  formApi.setData({}).open();
+  formApi.setData({ unitId: selectedUnit.value || undefined }).open();
 }
 function edit(row: Row) {
   formApi.setData(row).open();
@@ -197,6 +197,7 @@ function more(row: Row) {
           value-field="id"
           label-field="name"
           :default-expanded-level="2"
+          :show-toolbar="false"
           @select="selectUnit"
         />
       </Card>
