@@ -15,6 +15,7 @@ export interface NavigationMenu {
   children: NavigationMenu[];
 }
 const pages: Record<string, string> = {
+  '/admin/operation-logs': '/system/operation-log/list',
   '/admin/users': '/system/user/list',
   '/admin/units': '/system/dept/list',
   '/admin/roles': '/system/role/list',
