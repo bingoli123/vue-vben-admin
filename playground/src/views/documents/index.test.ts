@@ -46,6 +46,8 @@ vi.mock('antdv-next', async () => {
   };
 });
 
+vi.mock('./files.vue', () => ({ default: { template: '<div />' } }));
+
 const permissions = vi.hoisted(
   () => new Set(['add', 'delete', 'edit', 'query']),
 );

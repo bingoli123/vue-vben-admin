@@ -37,6 +37,7 @@ import {
   saveFolder,
 } from '#/api/documents/folders';
 
+import Files from './files.vue';
 import { folderDescendants, folderTree } from './tree';
 
 const { hasAccessByCodes } = useAccess();
@@ -317,11 +318,7 @@ const displayTime = (time: string) => new Date(time).toLocaleString();
           </Descriptions>
           <Empty v-else description="请选择左侧文件夹" />
         </Card>
-        <Card
-          :title="
-            selected ? `当前文件夹内容 · ${selected.name}` : '当前文件夹内容'
-          "
-        >
+        <Card v-if="selected && contents.length" title="子文件夹">
           <Table
             v-if="selected && contents.length"
             :columns="columns"
@@ -346,6 +343,7 @@ const displayTime = (time: string) => new Date(time).toLocaleString();
             "
           />
         </Card>
+        <Files :folder="selected" />
       </div>
     </div>
     <Modal
@@ -398,7 +396,7 @@ const displayTime = (time: string) => new Date(time).toLocaleString();
             继承上级文件夹的所属单位
           </div>
           <div v-else-if="existing" class="text-muted-foreground mt-1 text-xs">
-            修改所属单位将同时更新该文件夹下的全部子文件夹。
+            修改所属单位将同时更新全部子文件夹和文件的归属，上传时单位记录保持不变。
           </div>
         </FormItem>
         <FormItem
