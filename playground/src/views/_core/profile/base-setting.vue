@@ -36,8 +36,6 @@ const schema: VbenFormSchema[] = [
   ...[
     ['username', '账号'],
     ['employeeNo', '工号'],
-    ['fullPinyin', '全拼'],
-    ['attendanceNo', '考勤号'],
     ['unitName', '所属单位'],
     ['roleNames', '角色'],
   ].map(

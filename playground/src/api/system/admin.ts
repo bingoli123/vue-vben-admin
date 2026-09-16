@@ -44,16 +44,7 @@ const fields: Record<Kind, string[]> = {
     'description',
     'enabled',
   ],
-  users: [
-    'username',
-    'name',
-    'phone',
-    'employeeNo',
-    'fullPinyin',
-    'gender',
-    'unitId',
-    'attendanceNo',
-  ],
+  users: ['username', 'name', 'phone', 'employeeNo', 'gender', 'unitId'],
   roles: [
     'code',
     'name',
@@ -111,10 +102,6 @@ export async function saveRecord(
   );
   if (existing) {
     body.version = existing.version;
-    // 简化表单不覆盖历史全拼、考勤号或快捷图标。
-    const preserved = kind === 'users' ? ['fullPinyin', 'attendanceNo'] : [];
-    for (const key of preserved) body[key] = existing[key];
-    if (kind === 'menus') body.shortcutIcon = existing.shortcutIcon;
   }
   if (kind === 'users' && !existing) {
     const { keyId, encrypted } = await encryptPasswords(values.password);

@@ -21,6 +21,18 @@ const node = (
   ...extra,
 });
 describe('后端菜单投影', () => {
+  it('设计器按普通业务地址打开，旧页面用途和未授权入口不再映射', () => {
+    const routes = navigationRoutes([
+      node('designer', { url: '/reports/designer' }),
+      node('denied', { url: '/reports/designer', accessible: false }),
+      node('retired', { url: '/reports/designer', pageType: '报表设计' }),
+    ]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({
+      component: '/reports/index',
+      meta: { menuId: 'designer' },
+    });
+  });
   it('按钮权限不会变成页面，未知地址不执行任意组件', () => {
     expect(
       navigationRoutes([

@@ -39,18 +39,21 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <Page auto-content-height>
-    <Spin :spinning="loading" class="h-full">
-      <Alert
-        v-if="errorMessage"
-        :message="errorMessage"
-        type="error"
-        class="mb-4"
-      /><Button v-if="errorMessage" @click="open"> 重新打开报表 </Button><iframe
-        v-if="source"
+  <Page auto-content-height content-class="overflow-hidden p-0">
+    <Spin
+      :spinning="loading"
+      class="size-full"
+      :styles="{ container: { height: '100%', width: '100%' } }"
+    >
+      <div v-if="errorMessage" class="p-4">
+        <Alert :message="errorMessage" type="error" class="mb-4" />
+        <Button @click="open">重新打开报表</Button>
+      </div>
+      <iframe
+        v-else-if="source"
         :src="source"
         :title="String(route.meta.title)"
-        class="size-full min-h-[70vh] rounded-lg border-0 bg-white"
+        class="block size-full border-0 bg-white"
       ></iframe>
     </Spin>
   </Page>

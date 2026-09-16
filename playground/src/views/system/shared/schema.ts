@@ -2,7 +2,6 @@ import type { VbenFormSchema } from '#/adapter/form';
 import type { Kind, Row } from '#/api/system/admin';
 
 import { z } from '#/adapter/form';
-import { pageOptions } from '#/api/core/menu';
 import {
   asTree,
   menuOptions,
@@ -171,6 +170,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
           ]),
     ];
   const nonButton = depends((v) => v.menuType !== 'F');
+  const businessPage = input('url', '业务页面', 1000, true);
   return [
     {
       component: 'RadioGroup',
@@ -220,7 +220,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
       label: '页面用途',
       defaultValue: '普通页面',
       componentProps: {
-        options: ['普通页面', '报表设计', '报表查看'].map((value) => ({
+        options: ['普通页面', '报表查看'].map((value) => ({
           label: value,
           value,
         })),
@@ -228,13 +228,18 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
       dependencies: depends((v) => v.menuType === 'C'),
     },
     {
-      component: 'Select',
-      fieldName: 'url',
-      label: '业务页面',
-      componentProps: { options: pageOptions },
-      dependencies: depends(
-        (v) => v.menuType === 'C' && v.pageType === '普通页面',
-      ),
+      ...businessPage,
+      componentProps: {
+        ...businessPage.componentProps,
+        placeholder: '请输入业务页面地址，例如 /admin/users',
+      },
+      dependencies: {
+        ...depends((v) => v.menuType === 'C' && v.pageType === '普通页面'),
+        rules: (v: Record<string, any>) =>
+          v.menuType === 'C' && v.pageType === '普通页面'
+            ? (businessPage.rules ?? null)
+            : null,
+      },
     },
     {
       ...input('reportFile', '报表文件名'),
@@ -276,67 +281,6 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
           v.menuType === 'F' ? null : 'required',
       },
     },
-    {
-      component: 'Divider',
-      fieldName: 'advanced',
-      hideLabel: true,
-      formItemClass: 'col-span-full',
-      renderComponentContent: () => ({
-        default: () => '高级设置（暂未支持保存，只读）',
-      }),
-    },
-    ...[
-      ['activePath', '激活路径'],
-      ['linkSrc', '链接地址'],
-      ['badge', '徽标'],
-    ].map(
-      ([fieldName, label]) =>
-        ({
-          component: 'Input',
-          fieldName: fieldName ?? '',
-          label,
-          componentProps: { disabled: true },
-        }) as VbenFormSchema,
-    ),
-    {
-      component: 'Select',
-      fieldName: 'badgeType',
-      label: '徽标类型',
-      componentProps: {
-        disabled: true,
-        options: [
-          { label: '小圆点', value: 'dot' },
-          { label: '文字', value: 'normal' },
-        ],
-      },
-    },
-    {
-      component: 'Select',
-      fieldName: 'badgeVariants',
-      label: '徽标颜色',
-      componentProps: {
-        disabled: true,
-        options: ['default', 'success', 'warning', 'destructive'].map(
-          (value) => ({ label: value, value }),
-        ),
-      },
-    },
-    ...[
-      ['keepAlive', '缓存页面'],
-      ['affixTab', '固定标签'],
-      ['hideInMenu', '隐藏菜单'],
-      ['hideChildrenInMenu', '隐藏子菜单'],
-      ['hideInBreadcrumb', '隐藏面包屑'],
-      ['hideInTab', '隐藏标签'],
-    ].map(
-      ([fieldName, label]) =>
-        ({
-          component: 'Checkbox',
-          fieldName: fieldName ?? '',
-          label,
-          componentProps: { disabled: true },
-        }) as VbenFormSchema,
-    ),
   ];
 }
 export function searchSchema(kind: Kind): VbenFormSchema[] {
@@ -347,9 +291,7 @@ export function searchSchema(kind: Kind): VbenFormSchema[] {
       input('name', '姓名'),
       input('username', '账号', 64),
       input('employeeNo', '工号', 64),
-      input('fullPinyin', '全拼'),
       input('gender', '性别', 32),
-      input('attendanceNo', '考勤号', 64),
       {
         component: 'ApiSelect',
         fieldName: 'roleId',

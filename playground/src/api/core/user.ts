@@ -8,8 +8,6 @@ export interface Profile {
   name: string;
   gender: string;
   employeeNo: string;
-  fullPinyin: string;
-  attendanceNo: string;
   unitId: string;
   unitName: string;
   locked: boolean;

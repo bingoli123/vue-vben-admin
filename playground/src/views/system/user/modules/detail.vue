@@ -14,10 +14,8 @@ const items = computed(() =>
     ['name', '姓名'],
     ['phone', '手机号'],
     ['employeeNo', '工号'],
-    ['fullPinyin', '全拼'],
     ['gender', '性别'],
     ['unitName', '所属单位'],
-    ['attendanceNo', '考勤号'],
     ['createdAt', '创建时间'],
     ['updatedAt', '修改时间'],
   ].map(([key, label]) => ({

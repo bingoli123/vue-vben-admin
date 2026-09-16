@@ -41,10 +41,16 @@ describe('管理接口契约', () => {
     expect(body.employeeNo).toBeUndefined();
     expect(body).not.toHaveProperty('password');
   });
-  it('简化用户编辑表单保留数据库中的全拼和考勤号', async () => {
+  it('用户编辑不再提交已删除的全拼和考勤号，包括旧缓存中的值', async () => {
     await saveRecord(
       'users',
-      { username: 'tester', phone: '13900000000', employeeNo: '0007' },
+      {
+        username: 'tester',
+        phone: '13900000000',
+        employeeNo: '0007',
+        fullPinyin: 'ceshi',
+        attendanceNo: '0088',
+      },
       {
         id: '1',
         name: '测试',
@@ -58,11 +64,12 @@ describe('管理接口契约', () => {
       expect.objectContaining({
         phone: '13900000000',
         employeeNo: '0007',
-        fullPinyin: 'ceshi',
-        attendanceNo: '0088',
         version: 2,
       }),
     );
+    const [, body] = request.put.mock.calls[0] ?? [];
+    expect(body).not.toHaveProperty('fullPinyin');
+    expect(body).not.toHaveProperty('attendanceNo');
   });
   it('仅提交后端白名单字段，编辑携带读取版本，不提交只读高级设置', async () => {
     await saveRecord(
@@ -74,10 +81,16 @@ describe('管理接口契约', () => {
         code: 'wrong',
         pageType: '报表查看',
         activeIcon: 'lucide:user',
+        shortcutIcon: 'lucide:star',
         keepAlive: true,
         administrator: true,
       },
-      { id: '9007199254740993', name: '测试', version: 4 },
+      {
+        id: '9007199254740993',
+        name: '测试',
+        version: 4,
+        shortcutIcon: 'lucide:star',
+      },
     );
     const [path, body] = request.put.mock.calls[0] ?? [];
     expect(path).toBe('/admin/menus/9007199254740993');
@@ -88,6 +101,7 @@ describe('管理接口契约', () => {
       activeIcon: 'lucide:user',
     });
     expect(body).not.toHaveProperty('keepAlive');
+    expect(body).not.toHaveProperty('shortcutIcon');
     expect(body).not.toHaveProperty('administrator');
   });
   it('状态、锁定和删除使用独立操作及版本', async () => {

@@ -14,17 +14,12 @@ export interface NavigationMenu {
   sortOrder: number;
   children: NavigationMenu[];
 }
-export const pageOptions = [
-  { label: '用户管理', value: '/admin/users' },
-  { label: '单位管理', value: '/admin/units' },
-  { label: '角色管理', value: '/admin/roles' },
-  { label: '菜单管理', value: '/admin/menus' },
-];
 const pages: Record<string, string> = {
   '/admin/users': '/system/user/list',
   '/admin/units': '/system/dept/list',
   '/admin/roles': '/system/role/list',
   '/admin/menus': '/system/menu/list',
+  '/reports/designer': '/reports/index',
 };
 const legacyIcons: Record<string, string> = {
   TeamOutlined: 'lucide:users',
@@ -63,9 +58,12 @@ export function navigationRoutes(
         ];
       }
       if (!n.accessible) return [];
-      const component = ['报表查看', '报表设计'].includes(n.pageType)
-        ? '/reports/index'
-        : pages[n.url ?? ''];
+      let component: string | undefined;
+      if (n.pageType === '报表查看') {
+        component = '/reports/index';
+      } else if (n.pageType === '普通页面') {
+        component = pages[n.url ?? ''];
+      }
       if (!component) return [];
       return [
         {

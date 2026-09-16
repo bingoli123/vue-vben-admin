@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ApiComponent from '../../../../../packages/effects/common-ui/src/components/api-component/api-component.vue';
 import { schemaFor } from './schema';
 
-vi.mock('#/api/core/menu', () => ({ pageOptions: [] }));
 vi.mock('#/api/request', () => ({ requestClient: {} }));
 vi.mock('#/api/core/auth', () => ({ encryptPasswords: vi.fn() }));
 vi.mock('#/api/system/admin', async (original) => ({

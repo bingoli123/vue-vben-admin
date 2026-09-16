@@ -24,7 +24,7 @@ export function useColumns(): VxeTableGridColumns {
     {
       field: 'operation',
       title: '操作',
-      width: 230,
+      width: 260,
       fixed: 'right',
       slots: { default: 'action' },
     },
