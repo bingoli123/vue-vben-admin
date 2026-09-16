@@ -66,8 +66,9 @@ export function searchSchema(): VbenFormSchema[] {
     },
   ];
 }
-export function useColumns(): VxeTableGridColumns {
+export function useColumns(selectable = false): VxeTableGridColumns {
   return [
+    { type: 'checkbox', width: 44, fixed: 'left', visible: selectable },
     { field: 'id', title: '日志编号', minWidth: 110 },
     { field: 'module', title: '系统模块', minWidth: 120 },
     {

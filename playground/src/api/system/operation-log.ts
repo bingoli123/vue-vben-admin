@@ -9,6 +9,7 @@ import { requestClient } from '#/api/request';
 /** 日志全部为历史快照；未知字段保留空值，不用当前用户/单位信息补齐。 */
 export interface OperationLog {
   id: string;
+  version: number;
   actorId: null | string;
   username: null | string;
   actorName: null | string;
@@ -40,6 +41,8 @@ export const operationTypes = [
   { label: '新增', value: 'CREATE' },
   { label: '修改', value: 'UPDATE' },
   { label: '导出', value: 'EXPORT' },
+  { label: '删除', value: 'DELETE' },
+  { label: '清空', value: 'CLEAR' },
 ];
 export const deviceTypes = [
   { label: '电脑', value: 'PC' },
@@ -85,6 +88,23 @@ export async function getOperationLogs(params: Record<string, unknown>) {
 }
 export function getOperationLog(id: string) {
   return requestClient.get<OperationLog>(`/admin/operation-logs/${id}`);
+}
+
+/** 批量删除只提交选中的 ID 与版本；清空不携带筛选，明确针对全系统有效日志。 */
+export function deleteOperationLogs(
+  records: Pick<OperationLog, 'id' | 'version'>[],
+) {
+  return requestClient.post<{ affected: number }>(
+    '/admin/operation-logs/delete',
+    {
+      records: records.map(({ id, version }) => ({ id, version })),
+    },
+  );
+}
+export function clearOperationLogs() {
+  return requestClient.post<{ affected: number }>(
+    '/admin/operation-logs/clear',
+  );
 }
 
 /** 导出沿用已提交筛选，去掉分页；只有有效 XLSX 才触发下载。 */
