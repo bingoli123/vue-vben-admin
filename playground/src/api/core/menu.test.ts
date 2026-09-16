@@ -21,6 +21,17 @@ const node = (
   ...extra,
 });
 describe('后端菜单投影', () => {
+  it('文档菜单映射到正式文件夹页面，未授权入口不产生路由', () => {
+    const routes = navigationRoutes([
+      node('docs', { url: '/documents' }),
+      node('denied-docs', { url: '/documents', accessible: false }),
+    ]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({
+      component: '/documents/index',
+      meta: { menuId: 'docs' },
+    });
+  });
   it('设计器按普通业务地址打开，旧页面用途和未授权入口不再映射', () => {
     const routes = navigationRoutes([
       node('designer', { url: '/reports/designer' }),
