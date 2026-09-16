@@ -6,7 +6,7 @@ export interface Profile {
   id: string;
   username: string;
   name: string;
-  gender: string;
+  gender: null | string;
   employeeNo: string;
   unitId: string;
   unitName: string;
@@ -24,7 +24,7 @@ export interface Identity {
 export const getProfile = () => requestClient.get<Profile>('/auth/profile');
 export const updateProfile = (data: {
   name: string;
-  gender: string;
+  gender: null | string;
   version: number;
 }) => requestClient.put<Profile>('/auth/profile', data);
 export const uploadAvatar = (file: File, version: number) => {

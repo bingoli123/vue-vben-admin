@@ -13,7 +13,12 @@ export function useColumns(): VxeTableGridColumns {
       formatter: ({ cellValue }) => formatDateTime(cellValue),
     },
     { field: 'code', title: '单位编码', minWidth: 140 },
-    { field: 'category', title: '单位类别', minWidth: 140 },
+    {
+      field: 'category',
+      slots: { default: 'category' },
+      title: '单位类别',
+      minWidth: 140,
+    },
     { field: 'sortOrder', title: '排序', minWidth: 140 },
     { field: 'description', title: '说明', minWidth: 140 },
     {

@@ -8,6 +8,28 @@ import {
   roleOptions,
   unitOptions,
 } from '#/api/system/admin';
+import {
+  GENDER_DICTIONARY,
+  UNIT_CATEGORY_DICTIONARY,
+} from '#/api/system/dictionary-options';
+
+export function dictionaryField(
+  fieldName: string,
+  label: string,
+  dictionaryType: string,
+  allowUnknown = false,
+): VbenFormSchema {
+  return {
+    component: 'DictionarySelect',
+    fieldName,
+    label,
+    componentProps: {
+      dictionaryType,
+      allowUnknown,
+      placeholder: `请选择${label}`,
+    },
+  };
+}
 type Field = Exclude<VbenFormSchema, { type: 'group' }>;
 export const passwordRule = z
   .string()
@@ -93,7 +115,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
       parent,
       input('code', '单位编码', 64, true),
       input('name', '单位名称', 200, true),
-      input('category', '单位类别', 64),
+      dictionaryField('category', '单位类别', UNIT_CATEGORY_DICTIONARY),
       sort,
       status,
       description,
@@ -129,19 +151,7 @@ export function schemaFor(kind: Kind, existing?: Row): VbenFormSchema[] {
                 .regex(/^1[3-9]\d{9}$/, '请输入正确的11位手机号'),
       },
       input('employeeNo', '工号', 64),
-      {
-        component: 'Select',
-        fieldName: 'gender',
-        label: '性别',
-        componentProps: {
-          options: [
-            { label: '男', value: '男' },
-            { label: '女', value: '女' },
-          ],
-          placeholder: '请选择性别',
-          allowClear: true,
-        },
-      },
+      dictionaryField('gender', '性别', GENDER_DICTIONARY),
       {
         component: 'ApiTreeSelect',
         fieldName: 'unitId',
@@ -291,7 +301,7 @@ export function searchSchema(kind: Kind): VbenFormSchema[] {
       input('name', '姓名'),
       input('username', '账号', 64),
       input('employeeNo', '工号', 64),
-      input('gender', '性别', 32),
+      dictionaryField('gender', '性别', GENDER_DICTIONARY, true),
       {
         component: 'ApiSelect',
         fieldName: 'roleId',

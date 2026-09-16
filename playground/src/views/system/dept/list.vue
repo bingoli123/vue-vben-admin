@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Kind, Row } from '#/api/system/admin';
+import type { DictionaryOption } from '#/api/system/dictionary-options';
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page, useVbenDrawer } from '@vben/common-ui';
@@ -17,10 +18,18 @@ import {
   getList,
   permission,
 } from '#/api/system/admin';
+import {
+  dictionaryLabel,
+  getDictionaryOptions,
+  UNIT_CATEGORY_DICTIONARY,
+} from '#/api/system/dictionary-options';
 
+import { dictionaryField } from '../shared/schema';
 import { useColumns } from './data';
+import { filterUnitsByCategory } from './filter';
 import Form from './modules/form.vue';
 
+const dictionaryOptions = ref<DictionaryOption[]>([]);
 const kind: Kind = 'units';
 const { hasAccessByCodes: canCodes } = useAccess();
 const users = useUserStore();
@@ -33,6 +42,12 @@ const [FormDrawer, formApi] = useVbenDrawer({
 });
 
 const [Grid, gridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: [
+      dictionaryField('category', '单位类别', UNIT_CATEGORY_DICTIONARY, true),
+    ],
+    submitOnChange: true,
+  },
   gridOptions: {
     columns: useColumns(),
     height: 'auto',
@@ -47,9 +62,16 @@ const [Grid, gridApi] = useVbenVxeGrid({
     },
     proxyConfig: {
       ajax: {
-        query: async () => {
+        query: async (_params: unknown, values: Record<string, unknown>) => {
           if (!queryAllowed.value) return [];
-          return getList(kind, {});
+          const dictionary = await getDictionaryOptions(
+            UNIT_CATEGORY_DICTIONARY,
+          );
+          dictionaryOptions.value = dictionary.items;
+          const rows = await getList(kind, {});
+          return Array.isArray(rows)
+            ? filterUnitsByCategory(rows, values.category)
+            : [];
         },
       },
     },
@@ -57,7 +79,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
       custom: true,
       export: false,
       refresh: true,
-      search: false,
+      search: true,
       zoom: true,
     },
   },
@@ -145,6 +167,9 @@ function more(row: Row) {
         <Button v-if="createAllowed" type="primary" @click="create">
           <Plus class="size-5" />新增单位
         </Button>
+      </template>
+      <template #category="{ row }">
+        {{ dictionaryLabel(dictionaryOptions, row.category) }}
       </template>
       <template #state="{ row }">
         <Tag :color="row.enabled ? 'success' : 'error'">

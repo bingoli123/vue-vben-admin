@@ -11,6 +11,7 @@ import { useUserStore } from '@vben/stores';
 import { Avatar, Button, message, Spin, Upload } from 'antdv-next';
 
 import { getProfile, updateProfile, uploadAvatar } from '#/api';
+import { GENDER_DICTIONARY } from '#/api/system/dictionary-options';
 import { useAuthStore } from '#/store';
 const auth = useAuthStore();
 const users = useUserStore();
@@ -25,12 +26,12 @@ const schema: VbenFormSchema[] = [
     componentProps: { maxlength: 200 },
   },
   {
-    component: 'AutoComplete',
+    component: 'DictionarySelect',
     fieldName: 'gender',
     label: '性别',
     componentProps: {
-      options: [{ value: '男' }, { value: '女' }],
-      maxlength: 32,
+      dictionaryType: GENDER_DICTIONARY,
+      placeholder: '请选择性别',
     },
   },
   ...[
@@ -60,7 +61,7 @@ async function save(values: Record<string, any>) {
   try {
     profile.value = await updateProfile({
       name: values.name ?? '',
-      gender: values.gender ?? '',
+      gender: values.gender ?? null,
       version: profile.value.version,
     });
     await auth.fetchUserInfo();

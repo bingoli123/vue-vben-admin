@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Kind, Option, Row } from '#/api/system/admin';
+import type { DictionaryOption } from '#/api/system/dictionary-options';
 
 import { computed, onMounted, ref } from 'vue';
 
@@ -19,6 +20,11 @@ import {
   permission,
   unitOptions,
 } from '#/api/system/admin';
+import {
+  dictionaryLabel,
+  GENDER_DICTIONARY,
+  getDictionaryOptions,
+} from '#/api/system/dictionary-options';
 
 import Grants from '../shared/grants.vue';
 import Password from '../shared/password.vue';
@@ -27,6 +33,7 @@ import { useColumns } from './data';
 import Detail from './modules/detail.vue';
 import Form from './modules/form.vue';
 
+const dictionaryOptions = ref<DictionaryOption[]>([]);
 const kind: Kind = 'users';
 const { hasAccessByCodes: canCodes } = useAccess();
 const users = useUserStore();
@@ -76,6 +83,8 @@ const [Grid, gridApi] = useVbenVxeGrid({
           values: Record<string, unknown>,
         ) => {
           if (!queryAllowed.value) return { items: [], total: 0 };
+          const dictionary = await getDictionaryOptions(GENDER_DICTIONARY);
+          dictionaryOptions.value = dictionary.items;
           return getList(kind, {
             ...values,
             page: page.currentPage,
@@ -210,6 +219,9 @@ function more(row: Row) {
             <Button v-if="createAllowed" type="primary" @click="create">
               <Plus class="size-5" />新增用户
             </Button>
+          </template>
+          <template #gender="{ row }">
+            {{ dictionaryLabel(dictionaryOptions, row.gender) }}
           </template>
           <template #state="{ row }">
             <Tag :color="row.locked ? 'error' : 'success'">

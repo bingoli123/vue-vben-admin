@@ -64,7 +64,17 @@ vi.mock('#/adapter/form', () => ({
     },
   ],
 }));
-vi.mock('./schema', () => ({ schemaFor: () => [], searchSchema: () => [] }));
+vi.mock('./schema', () => ({
+  schemaFor: () => [],
+  searchSchema: () => [],
+  dictionaryField: () => ({}),
+}));
+vi.mock('#/api/system/dictionary-options', () => ({
+  GENDER_DICTIONARY: 'sys_gender',
+  UNIT_CATEGORY_DICTIONARY: 'sys_unit_category',
+  getDictionaryOptions: async () => ({ items: [] }),
+  dictionaryLabel: (_options: unknown, value: unknown) => value,
+}));
 vi.mock('#/api/core/menu', () => ({ menuIcon: (icon: string) => icon }));
 vi.mock('#/api/system/admin', () => ({
   getDetail: fixture.getDetail,

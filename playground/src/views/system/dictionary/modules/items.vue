@@ -12,10 +12,12 @@ import { Alert, Button, message } from 'antdv-next';
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
 import {
   deleteDictionaryItem,
+  dictionaryPermission,
   exportDictionaryItems,
   getDictionaryItems,
   itemPermission,
 } from '#/api/system/dictionary';
+import { refreshDictionaryCache } from '#/api/system/dictionary-options';
 
 import { searchSchema } from '../schema';
 import Form from './form.vue';
@@ -90,6 +92,10 @@ async function exportRows() {
     exporting.value = false;
   }
 }
+async function refreshCache() {
+  await refreshDictionaryCache(props.dictionary.type);
+  message.success('字典缓存已刷新');
+}
 function edit(row?: DictionaryItem) {
   formApi
     .setData({ kind: 'item', dictionaryId: props.dictionary.id, row })
@@ -131,6 +137,12 @@ function actions(row: DictionaryItem) {
       :table-title-help="dictionary.type"
     >
       <template #toolbar-tools>
+        <Button
+          v-if="hasAccessByCodes([dictionaryPermission('refresh')])"
+          @click="refreshCache"
+        >
+          刷新缓存
+        </Button>
         <Button v-if="can('export')" :loading="exporting" @click="exportRows">
           导出字典项
         </Button>

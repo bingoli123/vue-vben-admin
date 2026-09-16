@@ -6,7 +6,12 @@ export function useColumns(): VxeTableGridColumns {
     { field: 'state', title: '状态', width: 100, slots: { default: 'state' } },
     { field: 'phone', title: '手机号', minWidth: 140 },
     { field: 'employeeNo', title: '工号', minWidth: 140 },
-    { field: 'gender', title: '性别', minWidth: 140 },
+    {
+      field: 'gender',
+      slots: { default: 'gender' },
+      title: '性别',
+      minWidth: 140,
+    },
     { field: 'unitName', title: '所属单位', minWidth: 140 },
     {
       field: 'operation',

@@ -3,14 +3,25 @@ import { markRaw } from 'vue';
 
 import { Tree } from '@vben/common-ui';
 
-import Select from 'antdv-next/dist/select/index';
 import TreeSelect from 'antdv-next/dist/tree-select/index';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import DictionarySelect from '#/components/dictionary/dictionary-select.vue';
 
 import ApiComponent from '../../../../../packages/effects/common-ui/src/components/api-component/api-component.vue';
 import { schemaFor } from './schema';
 
-vi.mock('#/api/request', () => ({ requestClient: {} }));
+vi.mock('#/api/request', () => ({
+  requestClient: {
+    get: vi.fn(async () => ({
+      type: 'sys_gender',
+      items: [
+        { label: '男', value: '1', sortOrder: 10 },
+        { label: '女', value: '2', sortOrder: 20 },
+      ],
+    })),
+  },
+}));
 vi.mock('#/api/core/auth', () => ({ encryptPasswords: vi.fn() }));
 vi.mock('#/api/system/admin', async (original) => ({
   ...(await original<object>()),
@@ -83,15 +94,16 @@ describe('系统管理原生控件回归', () => {
     if (
       !field ||
       !('component' in field) ||
-      field.component !== 'Select' ||
+      field.component !== 'DictionarySelect' ||
       typeof field.componentProps !== 'object'
     )
       throw new Error('缺少性别选择器');
-    const component = Select;
+    const component = DictionarySelect;
     const wrapper = mount(component, {
       attachTo: document.body,
       props: {
         ...(field.componentProps as Record<string, unknown>),
+        dictionaryType: 'sys_gender',
         open: true,
       },
     });

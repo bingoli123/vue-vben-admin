@@ -626,6 +626,7 @@ export type ComponentType =
   | 'CollapsibleParams'
   | 'DatePicker'
   | 'DefaultButton'
+  | 'DictionarySelect'
   | 'Divider'
   | 'IconPicker'
   | 'Input'
@@ -661,6 +662,12 @@ export interface ComponentPropsMap {
   CollapsibleParams: CollapsibleParamsProps;
   DatePicker: DatePickerProps;
   DefaultButton: ButtonProps;
+  DictionarySelect: {
+    dictionaryType: string;
+    value?: null | string;
+    placeholder?: string;
+    allowUnknown?: boolean;
+  };
   Divider: DividerProps;
   IconPicker: IconPickerProps;
   Input: InputProps;
@@ -709,6 +716,9 @@ async function initComponentAdapter() {
       optionsPropName: 'treeData',
       visibleEvent: 'onOpenChange',
     }),
+    DictionarySelect: defineAsyncComponent(
+      () => import('#/components/dictionary/dictionary-select.vue'),
+    ),
     AutoComplete,
     Cascader,
     Checkbox,
