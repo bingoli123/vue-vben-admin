@@ -1,89 +1,66 @@
-<script lang="ts" setup>
-import type { SystemDeptApi } from '#/api/system/dept';
+<script setup lang="ts">
+import type { Row } from '#/api/system/admin';
 
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
-import { useVbenModal } from '@vben/common-ui';
-
-import { Button } from 'antdv-next';
+import { useVbenDrawer } from '@vben/common-ui';
 
 import { useVbenForm } from '#/adapter/form';
-import { createDept, updateDept } from '#/api/system/dept';
-import { $t } from '#/locales';
+import { getDetail, saveRecord } from '#/api/system/admin';
 
-import { useSchema } from '../data';
-
-const emit = defineEmits(['success']);
-const formData = ref<SystemDeptApi.SystemDept>();
-type DeptModalData =
-  | null
-  | SystemDeptApi.SystemDept
-  | { pid: SystemDeptApi.SystemDept['pid'] };
-
-const getTitle = computed(() => {
-  return formData.value?.id
-    ? $t('ui.actionTitle.edit', [$t('system.dept.name')])
-    : $t('ui.actionTitle.create', [$t('system.dept.name')]);
-});
-
+import { schemaFor } from '../../shared/schema';
+const emit = defineEmits<{ success: [] }>();
+const current = ref<Row>();
+const ready = ref(false);
 const [Form, formApi] = useVbenForm({
-  layout: 'vertical',
-  schema: useSchema(),
+  schema: schemaFor('units'),
   showDefaultActions: false,
+  commonConfig: { formItemClass: 'col-span-2 md:col-span-1' },
+  wrapperClass: 'grid-cols-2 gap-x-4',
 });
-
-function resetForm() {
-  formApi.reset();
-  formApi.setValues(formData.value || {});
-}
-
-const [Modal, modalApi] = useVbenModal<DeptModalData>({
-  async onConfirm() {
-    const { valid } = await formApi.validate();
-    if (valid) {
-      modalApi.lock();
-      const data = await formApi.getValues();
-      try {
-        await (formData.value?.id
-          ? updateDept(formData.value.id, data)
-          : createDept(data));
-        modalApi.close();
-        emit('success');
-      } finally {
-        modalApi.lock(false);
-      }
-    }
-  },
-  onOpenChange(isOpen) {
-    if (isOpen) {
-      const data = modalApi.getData();
-      if (data) {
-        formData.value = 'id' in data ? data : undefined;
-        const formValues = {
+const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
+  async onOpenChange(open) {
+    if (!open) return;
+    ready.value = false;
+    drawerApi.setState({ loading: true, showConfirmButton: false });
+    try {
+      const data = drawerApi.getData();
+      current.value = data?.id ? await getDetail('units', data.id) : undefined;
+      await formApi.reset();
+      formApi.setState({ schema: schemaFor('units', current.value) });
+      await nextTick();
+      await formApi.setValues(
+        current.value ?? {
+          enabled: true,
+          sortOrder: 0,
+          menuType: data?.menuType || 'C',
+          pageType: '普通页面',
+          platformType: '管理端',
           ...data,
-          ...(data.pid === 0 ? { pid: undefined } : {}),
-        };
-        formApi.setValues(formValues);
-      } else {
-        formData.value = undefined;
-        formApi.reset();
-      }
+        },
+      );
+      ready.value = true;
+      drawerApi.setState({ showConfirmButton: true });
+    } finally {
+      drawerApi.setState({ loading: false });
+    }
+  },
+  async onConfirm() {
+    if (!ready.value) return;
+    const validation = await formApi.validate();
+    if (!validation.valid) return;
+    drawerApi.lock();
+    try {
+      await saveRecord('units', await formApi.getValues(), current.value);
+      emit('success');
+      drawerApi.close();
+    } finally {
+      drawerApi.unlock();
     }
   },
 });
-
-defineExpose({ modalApi });
+const title = computed(() => `${current.value ? '编辑' : '新增'}单位`);
 </script>
-
 <template>
-  <Modal :title="getTitle">
-    <Form class="mx-4" />
-    <template #prepend-footer>
-      <div class="flex-auto">
-        <Button type="primary" danger @click="resetForm">
-          {{ $t('common.reset') }}
-        </Button>
-      </div>
-    </template>
-  </Modal>
+  <Drawer class="w-full max-w-200" :title="title"><Form class="mx-4" /></Drawer>
 </template>

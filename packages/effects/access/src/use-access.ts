@@ -28,6 +28,11 @@ function useAccess() {
    */
   function hasAccessByCodes(codes: string[]) {
     const userCodesSet = new Set(accessStore.accessCodes);
+    if (
+      userStore.userInfo?.administrator === true &&
+      userCodesSet.has('__xk_administrator__')
+    )
+      return true;
 
     const intersection = codes.filter((item) => userCodesSet.has(item));
     return intersection.length > 0;

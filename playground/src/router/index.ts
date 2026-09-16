@@ -29,7 +29,15 @@ const router = createRouter({
   // strict: true,
 });
 
-const resetRoutes = () => resetStaticRoutes(router, routes);
+const resetRoutes = () => {
+  resetStaticRoutes(router, routes);
+  // 同时清空 Root.children，避免原生动态路由合并时恢复上一位用户的菜单。
+  const root = routes.find((route) => route.name === 'Root');
+  if (root) {
+    router.removeRoute('Root');
+    router.addRoute({ ...root, children: [] });
+  }
+};
 
 // 创建路由守卫
 createRouterGuard(router);

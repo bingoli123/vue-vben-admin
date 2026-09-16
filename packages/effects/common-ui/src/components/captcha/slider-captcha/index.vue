@@ -38,6 +38,7 @@ const modelValue = defineModel<boolean>({ default: false });
 
 const state = reactive({
   endTime: 0,
+  isVerifying: false,
   isMoving: false,
   isPassing: false,
   moveDistance: 0,
@@ -48,6 +49,10 @@ const state = reactive({
 defineExpose({
   resume,
 });
+
+let points: { x: number; t: number }[] = [];
+let startedAt = 0;
+let attempt = 0;
 
 const wrapperRef = useTemplateRef<HTMLDivElement>('wrapperRef');
 const barRef = useTemplateRef<InstanceType<typeof SliderCaptchaBar>>('barRef');
@@ -75,14 +80,14 @@ watchEffect(() => {
 function getEventPageX(e: MouseEvent | TouchEvent): number {
   if ('pageX' in e) {
     return e.pageX;
-  } else if ('touches' in e && e.touches[0]) {
-    return e.touches[0].pageX;
+  } else if ('touches' in e) {
+    return (e.touches[0] ?? e.changedTouches[0])?.pageX ?? 0;
   }
   return 0;
 }
 
 function handleDragStart(e: MouseEvent | TouchEvent) {
-  if (state.isPassing) {
+  if (state.isPassing || state.isVerifying || props.disabled) {
     return;
   }
   const actionEl = actionRef.value;
@@ -94,6 +99,8 @@ function handleDragStart(e: MouseEvent | TouchEvent) {
     getEventPageX(e) -
     Number.parseInt(actionStyle.left.replace('px', '') || '0', 10);
   state.startTime = Date.now();
+  startedAt = performance.now();
+  points = [{ x: 0, t: 0 }];
   state.isMoving = true;
 }
 
@@ -114,6 +121,12 @@ function handleDragMoving(e: MouseEvent | TouchEvent) {
     if (!actionNode) return;
     const { actionWidth, offset, wrapperWidth } = getOffset(actionNode);
     const moveX = getEventPageX(e) - moveDistance;
+    const t = Math.round(performance.now() - startedAt);
+    if (t > (points.at(-1)?.t ?? 0) && points.length < 198)
+      points.push({
+        x: Math.round(Math.max(0, Math.min(1, moveX / offset)) * 1000),
+        t,
+      });
 
     emit('move', {
       event: e,
@@ -170,17 +183,38 @@ function handleDragOver(e: MouseEvent | TouchEvent) {
   }
 }
 
-function checkPass() {
+async function checkPass() {
+  if (state.isVerifying || state.isPassing) return;
   if (props.isSlot) {
     resume();
     return;
   }
   state.endTime = Date.now();
+  if (props.verify) {
+    const current = ++attempt;
+    state.isMoving = false;
+    state.isVerifying = true;
+    let passed = false;
+    try {
+      passed = await props.verify(points);
+    } catch {
+      /* 调用方负责业务错误提示。 */
+    }
+    if (current !== attempt) return;
+    state.isVerifying = false;
+    if (!passed) {
+      resume();
+      return;
+    }
+  }
   state.isPassing = true;
   state.isMoving = false;
 }
 
 function resume() {
+  attempt++;
+  modelValue.value = false;
+  state.isVerifying = false;
   state.isMoving = false;
   state.isPassing = false;
   state.moveDistance = 0;

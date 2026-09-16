@@ -1,125 +1,138 @@
-import type { Recordable, UserInfo } from '@vben/types';
+import type { Recordable } from '@vben/types';
 
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { LOGIN_PATH } from '@vben/constants';
-import { preferences } from '@vben/preferences';
 import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 
-import { notification } from 'antdv-next';
 import { defineStore } from 'pinia';
 
-import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
-import { $t } from '#/locales';
+import {
+  getAccessCodesApi,
+  getAvatar,
+  getUserInfoApi,
+  loginApi,
+  logoutApi,
+} from '#/api';
+import { resetRoutes } from '#/router';
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessStore = useAccessStore();
-  const userStore = useUserStore();
+  const access = useAccessStore();
+  const users = useUserStore();
   const router = useRouter();
-
   const loginLoading = ref(false);
-
-  /**
-   * 异步处理登录操作
-   * Asynchronously handle the login process
-   * @param params 登录表单数据
-   * @param onSuccess 成功之后的回调函数
-   */
+  const expiresAt = ref(0);
+  let generation = 0;
+  let avatarUrl = '';
+  function setExpiresAt(value: number) {
+    expiresAt.value = value;
+  }
+  async function refreshAvatar() {
+    const token = access.accessToken;
+    const profile = users.userInfo?.profile as
+      | undefined
+      | { hasAvatar?: boolean };
+    if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    avatarUrl = '';
+    if (profile?.hasAvatar) {
+      const blob = await getAvatar();
+      if (token !== access.accessToken) return;
+      avatarUrl = URL.createObjectURL(blob);
+    }
+    if (users.userInfo)
+      users.setUserInfo({ ...users.userInfo, avatar: avatarUrl });
+  }
+  async function fetchUserInfo() {
+    const token = access.accessToken;
+    const current = generation;
+    const [info, grants] = await Promise.all([
+      getUserInfoApi(),
+      getAccessCodesApi(),
+    ]);
+    if (token !== access.accessToken || current !== generation)
+      throw new Error('会话已变更');
+    users.setUserInfo(info);
+    // 管理员来自后端固定身份标记，不从角色名称推断。
+    access.setAccessCodes(
+      grants.administrator
+        ? ['__xk_administrator__', ...grants.permissions]
+        : grants.permissions,
+    );
+    try {
+      await refreshAvatar();
+    } catch {
+      /* 头像存储短时故障不阻止有效账号登录。 */
+    }
+    return info;
+  }
+  async function clearSession(redirect = true) {
+    generation++;
+    if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    avatarUrl = '';
+    const path = router.currentRoute.value.fullPath;
+    resetAllStores();
+    resetRoutes();
+    await router.replace({
+      path: LOGIN_PATH,
+      query: redirect && !path.startsWith('/auth') ? { redirect: path } : {},
+    });
+  }
   async function authLogin(
     params: Recordable<any>,
     onSuccess?: () => Promise<void> | void,
   ) {
-    // 异步处理用户登录操作并获取 accessToken
-    let userInfo: null | UserInfo = null;
+    loginLoading.value = true;
     try {
-      loginLoading.value = true;
-      const { accessToken } = await loginApi(params);
-
-      // 如果成功获取到 accessToken
-      if (accessToken) {
-        accessStore.setAccessToken(accessToken);
-
-        // 获取用户信息并存储到 accessStore 中
-        const [fetchUserInfoResult, accessCodes] = await Promise.all([
-          fetchUserInfo(),
-          getAccessCodesApi(),
-        ]);
-
-        userInfo = fetchUserInfoResult;
-
-        accessStore.setAccessCodes(accessCodes);
-
-        if (accessStore.loginExpired) {
-          accessStore.setLoginExpired(false);
-        } else {
-          onSuccess
-            ? await onSuccess?.()
-            : await router.push(
-                userInfo.homePath || preferences.app.defaultHomePath,
-              );
-        }
-
-        if (userInfo?.realName) {
-          notification.success({
-            description: `${$t('authentication.loginSuccessDesc')}:${userInfo?.realName}`,
-            duration: 3,
-            title: $t('authentication.loginSuccess'),
-          });
-        }
-      }
+      const result = await loginApi({
+        username: params.username,
+        password: params.password,
+        captchaToken: params.captchaToken,
+      });
+      access.setAccessToken(result.token);
+      setExpiresAt(Date.now() + result.expiresIn * 1000);
+      access.setIsAccessChecked(false);
+      resetRoutes();
+      const userInfo = await fetchUserInfo();
+      const redirect = router.currentRoute.value.query.redirect;
+      await (onSuccess
+        ? onSuccess()
+        : router.replace(
+            typeof redirect === 'string' &&
+              redirect.startsWith('/') &&
+              !redirect.startsWith('//') &&
+              !redirect.startsWith('/auth')
+              ? redirect
+              : '/dashboard',
+          ));
+      return { userInfo };
+    } catch (error) {
+      if (access.accessToken) await clearSession(false);
+      throw error;
     } finally {
       loginLoading.value = false;
     }
-
-    return {
-      userInfo,
-    };
   }
-
-  const isLoggingOut = ref(false); // 正在 logout 标识, 防止 /logout 死循环.
-
-  async function logout(redirect: boolean = true) {
-    if (isLoggingOut.value) return; // 正在登出中, 说明已进入循环, 直接返回.
-    isLoggingOut.value = true; // 设置 标识
-
+  async function logout(redirect = true) {
     try {
-      await logoutApi();
-    } catch {
-      // 不做任何处理
+      if (access.accessToken) await logoutApi();
     } finally {
-      isLoggingOut.value = false; // 重置 标识
-
-      resetAllStores();
-      accessStore.setLoginExpired(false);
+      await clearSession(redirect);
     }
-
-    // 回登录页带上当前路由地址
-    await router.replace({
-      path: LOGIN_PATH,
-      query: redirect
-        ? {
-            redirect: encodeURIComponent(router.currentRoute.value.fullPath),
-          }
-        : {},
-    });
   }
-
-  async function fetchUserInfo() {
-    const userInfo = await getUserInfoApi();
-    userStore.setUserInfo(userInfo);
-    return userInfo;
-  }
-
   function $reset() {
     loginLoading.value = false;
+    expiresAt.value = 0;
   }
-
   return {
     $reset,
     authLogin,
+    clearSession,
+    expiresAt,
     fetchUserInfo,
     loginLoading,
     logout,
+    refreshAvatar,
+    setExpiresAt,
   };
 });

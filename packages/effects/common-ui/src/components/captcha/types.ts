@@ -73,6 +73,9 @@ export interface PointSelectionCaptchaProps extends PointSelectionCaptchaCardPro
 }
 
 export interface SliderCaptchaProps {
+  /** 可选服务端验证钩子；通过后才设置原生成功状态。轨迹按行程归一化至 0..1000。 */
+  verify?: (points: { x: number; t: number }[]) => Promise<boolean>;
+  disabled?: boolean;
   class?: ClassType;
   /**
    * @description 滑块的样式

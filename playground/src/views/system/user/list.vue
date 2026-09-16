@@ -1,79 +1,90 @@
-<script lang="ts" setup>
-import type { Dayjs } from 'dayjs';
+<script setup lang="ts">
+import type { Kind, Option, Row } from '#/api/system/admin';
 
-import type { Recordable } from '@vben/types';
+import { computed, onMounted, ref } from 'vue';
 
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-import type { SystemDeptApi, SystemUserApi } from '#/api';
-
-import { onMounted, ref, watch } from 'vue';
-
-import { Page, Tree, useVbenDrawer } from '@vben/common-ui';
+import { useAccess } from '@vben/access';
+import { Page, Tree, useVbenDrawer, useVbenModal } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
+import { useUserStore } from '@vben/stores';
 
-import { Button, Card, InputSearch, message, Modal } from 'antdv-next';
+import { Alert, Button, Card, message, Modal, Tag } from 'antdv-next';
 
 import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
-import { deleteUser, getDeptList, getUserList, updateUser } from '#/api';
-import { $t } from '#/locales';
-import { createDateRangeCodec } from '#/utils/date-range-codec';
+import {
+  asTree,
+  changeStatus,
+  deleteRecord,
+  getList,
+  permission,
+  unitOptions,
+} from '#/api/system/admin';
 
-import { useColumns, useGridFormSchema } from './data';
+import Grants from '../shared/grants.vue';
+import Password from '../shared/password.vue';
+import { searchSchema } from '../shared/schema';
+import { useColumns } from './data';
 import Detail from './modules/detail.vue';
 import Form from './modules/form.vue';
 
-interface UserSearchFormValues extends Record<string, unknown> {
-  createTime?: [Dayjs, Dayjs];
-}
-
-const userSearchCodec = createDateRangeCodec<UserSearchFormValues>()({
-  endField: 'endTime',
-  rangeField: 'createTime',
-  startField: 'startTime',
-});
-
-type UserSearchSubmitValues = ReturnType<typeof userSearchCodec.encode>;
-
-const deptList = ref<SystemDeptApi.SystemDept[]>([]);
-const inputSearchValue = ref('');
-const selectedDeptId = ref<string>('');
-
-const [FormDrawer, formDrawerApi] = useVbenDrawer({
+const kind: Kind = 'users';
+const { hasAccessByCodes: canCodes } = useAccess();
+const users = useUserStore();
+const can = (code: string) => canCodes([code]);
+const queryAllowed = computed(() => can(permission(kind, 'query')));
+const createAllowed = computed(() => can(permission(kind, 'add')));
+const [FormDrawer, formApi] = useVbenDrawer({
   connectedComponent: Form,
   destroyOnClose: true,
 });
-
-const [DetailDrawer, detailDrawerApi] = useVbenDrawer({
+const [GrantsDrawer, grantsApi] = useVbenDrawer({
+  connectedComponent: Grants,
+  destroyOnClose: true,
+});
+const [DetailDrawer, detailApi] = useVbenDrawer({
   connectedComponent: Detail,
   destroyOnClose: true,
 });
+const [PasswordModal, passwordApi] = useVbenModal({
+  connectedComponent: Password,
+  destroyOnClose: true,
+});
+
+const unitList = ref<Option[]>([]);
+const selectedUnit = ref<string>('');
+const unitTree = computed(() => asTree(unitList.value));
+onMounted(async () => {
+  if (queryAllowed.value) unitList.value = await unitOptions();
+});
+function selectUnit(node: any) {
+  selectedUnit.value = String(node.value?.id ?? '');
+  refresh();
+}
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  formOptions: {
-    codec: userSearchCodec,
-    schema: useGridFormSchema(),
-    submitOnChange: true,
-  },
+  formOptions: { schema: searchSchema(kind), submitOnChange: true },
   gridOptions: {
-    columns: useColumns(onStatusChange),
+    columns: useColumns(),
     height: 'auto',
     keepSource: true,
+    rowConfig: { keyField: 'id' },
+
     proxyConfig: {
       ajax: {
-        query: async ({ page }, formValues: UserSearchSubmitValues) => {
-          return await getUserList({
+        query: async (
+          { page }: { page: { currentPage: number; pageSize: number } },
+          values: Record<string, unknown>,
+        ) => {
+          if (!queryAllowed.value) return { items: [], total: 0 };
+          return getList(kind, {
+            ...values,
             page: page.currentPage,
-            pageSize: page.pageSize,
-            ...formValues,
-            deptId: selectedDeptId.value,
+            size: Math.min(page.pageSize, 200),
+            unitId: selectedUnit.value,
           });
         },
       },
     },
-    rowConfig: {
-      keyField: 'id',
-    },
-
     toolbarConfig: {
       custom: true,
       export: false,
@@ -81,177 +92,130 @@ const [Grid, gridApi] = useVbenVxeGrid({
       search: true,
       zoom: true,
     },
-  } as VxeTableGridOptions<SystemUserApi.SystemUser>,
+  },
 });
-
-/**
- * 将Antd的Modal.confirm封装为promise，方便在异步函数中调用。
- * @param content 提示内容
- * @param title 提示标题
- */
-function confirm(content: string, title: string) {
-  return new Promise((reslove, reject) => {
-    Modal.confirm({
-      content,
-      onCancel() {
-        reject(new Error('已取消'));
-      },
-      onOk() {
-        reslove(true);
-      },
-      title,
-    });
+function refresh() {
+  void gridApi.query();
+}
+function create() {
+  formApi.setData({}).open();
+}
+function edit(row: Row) {
+  formApi.setData(row).open();
+}
+async function remove(row: Row) {
+  await deleteRecord(kind, row);
+  message.success('已删除');
+  refresh();
+}
+function toggle(row: Row) {
+  Modal.confirm({
+    title: '修改状态',
+    content: `确认${row.locked ? '解锁' : '锁定'}${row.name || row.username}？`,
+    async onOk() {
+      await changeStatus(kind, row);
+      refresh();
+    },
   });
 }
-
-/**
- * 状态开关即将改变
- * @param newStatus 期望改变的状态值
- * @param row 行数据
- * @returns 返回false则中止改变，返回其他值（undefined、true）则允许改变
- */
-async function onStatusChange(
-  newStatus: number,
-  row: SystemUserApi.SystemUser,
-) {
-  const status: Recordable<string> = {
-    0: '禁用',
-    1: '启用',
-  };
-  try {
-    await confirm(
-      `你要将${row.name}的状态切换为 【${status[newStatus.toString()]}】 吗？`,
-      `切换状态`,
-    );
-    await updateUser(row.id, { status: newStatus });
-    return true;
-  } catch {
-    return false;
-  }
+function actions(row: Row) {
+  return [
+    {
+      text: '详情',
+      icon: 'lucide:eye',
+      auth: [permission(kind, 'query', row)],
+      onClick: () => detailApi.setData(row).open(),
+    },
+    {
+      text: '编辑',
+      icon: 'lucide:edit',
+      auth: [permission(kind, 'edit', row)],
+      ifShow: !row.administrator || row.id === users.userInfo?.userId,
+      onClick: () => edit(row),
+    },
+  ];
 }
-
-function onEdit(row: SystemUserApi.SystemUser) {
-  formDrawerApi.setData(row).open();
+function more(row: Row) {
+  return [
+    {
+      text: '分配角色',
+      icon: 'lucide:users',
+      auth: ['platform:user:assign-role'],
+      ifShow: !row.administrator,
+      onClick: () => grantsApi.setData({ kind: 'users', row }).open(),
+    },
+    {
+      text: '重置密码',
+      icon: 'lucide:key-round',
+      auth: ['platform:user:reset-password'],
+      ifShow: !row.administrator || row.id === users.userInfo?.userId,
+      onClick: () => passwordApi.setData(row).open(),
+    },
+    {
+      text: row.locked ? '解锁' : '锁定',
+      icon: 'lucide:power',
+      auth: [permission(kind, 'lock', row)],
+      ifShow: !row.administrator,
+      onClick: () => toggle(row),
+    },
+    {
+      text: '删除',
+      icon: 'lucide:trash-2',
+      danger: true,
+      auth: [permission(kind, 'delete', row)],
+      ifShow: !row.administrator,
+      popConfirm: {
+        title: `确认删除 ${row.name || row.username}？`,
+        confirm: () => remove(row),
+      },
+    },
+  ];
 }
-
-function onDetail(row: SystemUserApi.SystemUser) {
-  detailDrawerApi.setData(row).open();
-}
-
-function onDelete(row: SystemUserApi.SystemUser) {
-  const hideLoading = message.loading({
-    content: $t('ui.actionMessage.deleting', [row.name]),
-    duration: 0,
-    key: 'action_process_msg',
-  });
-  deleteUser(row.id)
-    .then(() => {
-      message.success({
-        content: $t('ui.actionMessage.deleteSuccess', [row.name]),
-        key: 'action_process_msg',
-      });
-      onRefresh();
-    })
-    .catch(() => {
-      hideLoading();
-    });
-}
-
-function onRefresh() {
-  gridApi.query();
-}
-
-function onCreate() {
-  formDrawerApi.setData(null).open();
-}
-
-async function loadDeptList() {
-  try {
-    const res = await getDeptList();
-    deptList.value = res;
-  } catch (error) {
-    console.error('Failed to load department list:', error);
-  }
-}
-
-function selectDept(v: string) {
-  selectedDeptId.value = v;
-  gridApi.query();
-}
-
-function searchDept(value: string) {
-  if (!value) {
-    loadDeptList();
-    return;
-  }
-  const filtered = deptList.value.filter((dept) =>
-    dept.name.toLowerCase().includes(value.toLowerCase()),
-  );
-  deptList.value = filtered;
-}
-
-onMounted(() => {
-  loadDeptList();
-});
-
-watch(inputSearchValue, (value) => {
-  searchDept(value);
-});
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="onRefresh" />
-    <DetailDrawer @success="onRefresh" />
-    <div class="flex size-full">
-      <Card class="w-1/6">
-        <InputSearch
-          v-model:value="inputSearchValue"
-          :placeholder="$t('system.user.placeholder')"
-        />
-        <Tree
-          label-field="name"
+    <FormDrawer @success="refresh" /><GrantsDrawer @success="refresh" />
+    <DetailDrawer /><PasswordModal @success="refresh" />
+    <Alert
+      v-if="!queryAllowed"
+      class="mb-4"
+      type="info"
+      message="当前账号拥有菜单访问权限，但尚未授予查询权限。"
+    />
+    <div class="flex size-full gap-4">
+      <Card class="w-1/5 min-w-48">
+        <Button
+          type="link"
+          @click="
+            selectedUnit = '';
+            refresh();
+          "
+        >
+          全部单位
+</Button><Tree
+          :tree-data="unitTree"
           value-field="id"
-          :tree-data="deptList"
+          label-field="name"
           :default-expanded-level="2"
-          @select="selectDept"
+          @select="selectUnit"
         />
       </Card>
-
-      <div class="w-5/6 ml-4">
-        <Grid :table-title="$t('system.user.list')">
+      <div class="min-w-0 flex-1">
+        <Grid table-title="用户管理">
           <template #toolbar-tools>
-            <Button type="primary" @click="onCreate">
-              <Plus class="size-5" />
-              {{ $t('ui.actionTitle.create', [$t('system.user.name')]) }}
+            <Button v-if="createAllowed" type="primary" @click="create">
+              <Plus class="size-5" />新增用户
             </Button>
+          </template>
+          <template #state="{ row }">
+            <Tag :color="row.locked ? 'error' : 'success'">
+              {{ row.locked ? '锁定' : '正常' }}
+            </Tag>
           </template>
           <template #action="{ row }">
             <VbenTableAction
-              :actions="[
-                {
-                  text: $t('common.detail'),
-                  icon: 'lucide:eye',
-                  onClick: () => onDetail(row),
-                },
-                {
-                  text: $t('common.edit'),
-                  icon: 'lucide:edit',
-                  onClick: () => onEdit(row),
-                },
-              ]"
-              :dropdown-actions="[
-                {
-                  text: $t('common.delete'),
-                  icon: 'lucide:trash-2',
-                  danger: true,
-                  popConfirm: {
-                    title: $t('ui.actionMessage.deleteConfirm', [row.name]),
-                    confirm: () => onDelete(row),
-                  },
-                  auth: ['AC_100100'],
-                },
-              ]"
-              align="center"
+              :actions="actions(row as Row)"
+              :dropdown-actions="more(row as Row)"
             />
           </template>
         </Grid>

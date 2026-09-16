@@ -1,121 +1,66 @@
-<script lang="ts" setup>
-import type { DataNode } from 'antdv-next/dist/tree';
-
-import type { Recordable } from '@vben/types';
-
-import type { SystemUserApi } from '#/api/system/user';
+<script setup lang="ts">
+import type { Row } from '#/api/system/admin';
 
 import { computed, nextTick, ref } from 'vue';
 
-import { Tree, useVbenDrawer } from '@vben/common-ui';
-
-import { Spin } from 'antdv-next';
+import { useVbenDrawer } from '@vben/common-ui';
 
 import { useVbenForm } from '#/adapter/form';
-import { getMenuList } from '#/api/system/menu';
-import { createUser, updateUser } from '#/api/system/user';
-import { $t } from '#/locales';
+import { getDetail, saveRecord } from '#/api/system/admin';
 
-import { useFormSchema } from '../data';
-
-const emits = defineEmits(['success']);
-
-const formData = ref<SystemUserApi.SystemUser>();
-
+import { schemaFor } from '../../shared/schema';
+const emit = defineEmits<{ success: [] }>();
+const current = ref<Row>();
+const ready = ref(false);
 const [Form, formApi] = useVbenForm({
-  schema: useFormSchema(),
+  schema: schemaFor('users'),
   showDefaultActions: false,
+  commonConfig: { formItemClass: 'col-span-2 md:col-span-1' },
+  wrapperClass: 'grid-cols-2 gap-x-4',
 });
-
-const permissions = ref<DataNode[]>([]);
-const loadingPermissions = ref(false);
-
-const id = ref();
-const [Drawer, drawerApi] = useVbenDrawer<null | SystemUserApi.SystemUser>({
-  async onConfirm() {
-    const { valid } = await formApi.validate();
-    if (!valid) return;
-    const values = await formApi.getValues();
-    drawerApi.lock();
-    (id.value ? updateUser(id.value, values) : createUser(values))
-      .then(() => {
-        emits('success');
-        drawerApi.close();
-      })
-      .catch(() => {
-        drawerApi.unlock();
-      });
-  },
-
-  async onOpenChange(isOpen) {
-    if (isOpen) {
+const [Drawer, drawerApi] = useVbenDrawer<Partial<Row>>({
+  async onOpenChange(open) {
+    if (!open) return;
+    ready.value = false;
+    drawerApi.setState({ loading: true, showConfirmButton: false });
+    try {
       const data = drawerApi.getData();
-      formApi.reset();
-
-      if (data) {
-        formData.value = data;
-        id.value = data.id;
-      } else {
-        formData.value = undefined;
-        id.value = undefined;
-      }
-
-      if (permissions.value.length === 0) {
-        await loadPermissions();
-      }
-      // Wait for Vue to flush DOM updates (form fields mounted)
+      current.value = data?.id ? await getDetail('users', data.id) : undefined;
+      await formApi.reset();
+      formApi.setState({ schema: schemaFor('users', current.value) });
       await nextTick();
-      if (data) {
-        formApi.setValues(data);
-      }
+      await formApi.setValues(
+        current.value ?? {
+          enabled: true,
+          sortOrder: 0,
+          menuType: data?.menuType || 'C',
+          pageType: '普通页面',
+          platformType: '管理端',
+          ...data,
+        },
+      );
+      ready.value = true;
+      drawerApi.setState({ showConfirmButton: true });
+    } finally {
+      drawerApi.setState({ loading: false });
+    }
+  },
+  async onConfirm() {
+    if (!ready.value) return;
+    const validation = await formApi.validate();
+    if (!validation.valid) return;
+    drawerApi.lock();
+    try {
+      await saveRecord('users', await formApi.getValues(), current.value);
+      emit('success');
+      drawerApi.close();
+    } finally {
+      drawerApi.unlock();
     }
   },
 });
-
-defineExpose({ drawerApi });
-
-async function loadPermissions() {
-  loadingPermissions.value = true;
-  try {
-    const res = await getMenuList();
-    permissions.value = res as unknown as DataNode[];
-  } finally {
-    loadingPermissions.value = false;
-  }
-}
-
-const getDrawerTitle = computed(() => {
-  return formData.value?.id
-    ? $t('common.edit', $t('system.user.name'))
-    : $t('common.create', $t('system.user.name'));
-});
-
-function getNodeClass(node: Recordable<any>) {
-  const classes: string[] = [];
-  if (node.value?.type === 'button') {
-    classes.push('inline-flex');
-  }
-
-  return classes.join(' ');
-}
+const title = computed(() => `${current.value ? '编辑' : '新增'}用户`);
 </script>
 <template>
-  <Drawer :title="getDrawerTitle">
-    <Form>
-      <template #permissions="slotProps">
-        <Spin :spinning="loadingPermissions" :classes="{ root: 'w-full' }">
-          <Tree
-            :tree-data="permissions"
-            multiple
-            bordered
-            :default-expanded-level="2"
-            :get-node-class="getNodeClass"
-            v-bind="slotProps.componentProps"
-            value-field="id"
-            label-field="name"
-          />
-        </Spin>
-      </template>
-    </Form>
-  </Drawer>
+  <Drawer class="w-full max-w-200" :title="title"><Form class="mx-4" /></Drawer>
 </template>

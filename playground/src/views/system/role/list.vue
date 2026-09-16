@@ -1,69 +1,66 @@
-<script lang="ts" setup>
-import type { Dayjs } from 'dayjs';
+<script setup lang="ts">
+import type { Kind, Row } from '#/api/system/admin';
 
-import type { Recordable } from '@vben/types';
+import { computed } from 'vue';
 
-import type {
-  OnActionClickParams,
-  VxeTableGridOptions,
-} from '#/adapter/vxe-table';
-import type { SystemRoleApi } from '#/api';
-
+import { useAccess } from '@vben/access';
 import { Page, useVbenDrawer } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
+import { useUserStore } from '@vben/stores';
 
-import { Button, message, Modal } from 'antdv-next';
+import { Alert, Button, message, Modal, Tag } from 'antdv-next';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { deleteRole, getRoleList, updateRole } from '#/api';
-import { $t } from '#/locales';
-import { createDateRangeCodec } from '#/utils/date-range-codec';
+import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
+import {
+  changeStatus,
+  deleteRecord,
+  getList,
+  permission,
+} from '#/api/system/admin';
 
-import { useColumns, useGridFormSchema } from './data';
+import Grants from '../shared/grants.vue';
+import { searchSchema } from '../shared/schema';
+import { useColumns } from './data';
 import Form from './modules/form.vue';
 
-interface RoleSearchFormValues extends Record<string, unknown> {
-  createTime?: [Dayjs, Dayjs];
-}
-
-const roleSearchCodec = createDateRangeCodec<RoleSearchFormValues>()({
-  endField: 'endTime',
-  rangeField: 'createTime',
-  startField: 'startTime',
-});
-
-type RoleSearchSubmitValues = ReturnType<typeof roleSearchCodec.encode>;
-
-const [FormDrawer, formDrawerApi] = useVbenDrawer({
+const kind: Kind = 'roles';
+const { hasAccessByCodes: canCodes } = useAccess();
+const users = useUserStore();
+const can = (code: string) => canCodes([code]);
+const queryAllowed = computed(() => can(permission(kind, 'query')));
+const createAllowed = computed(() => can(permission(kind, 'add')));
+const [FormDrawer, formApi] = useVbenDrawer({
   connectedComponent: Form,
+  destroyOnClose: true,
+});
+const [GrantsDrawer, grantsApi] = useVbenDrawer({
+  connectedComponent: Grants,
   destroyOnClose: true,
 });
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  formOptions: {
-    codec: roleSearchCodec,
-    schema: useGridFormSchema(),
-    submitOnChange: true,
-  },
+  formOptions: { schema: searchSchema(kind), submitOnChange: true },
   gridOptions: {
-    columns: useColumns(onActionClick, onStatusChange),
+    columns: useColumns(),
     height: 'auto',
     keepSource: true,
+    rowConfig: { keyField: 'id' },
+
     proxyConfig: {
       ajax: {
-        query: async ({ page }, formValues: RoleSearchSubmitValues) => {
-          return await getRoleList({
+        query: async (
+          { page }: { page: { currentPage: number; pageSize: number } },
+          values: Record<string, unknown>,
+        ) => {
+          if (!queryAllowed.value) return { items: [], total: 0 };
+          return getList(kind, {
+            ...values,
             page: page.currentPage,
-            pageSize: page.pageSize,
-            ...formValues,
+            size: Math.min(page.pageSize, 200),
           });
         },
       },
     },
-    rowConfig: {
-      keyField: 'id',
-    },
-
     toolbarConfig: {
       custom: true,
       export: false,
@@ -71,108 +68,99 @@ const [Grid, gridApi] = useVbenVxeGrid({
       search: true,
       zoom: true,
     },
-  } as VxeTableGridOptions<SystemRoleApi.SystemRole>,
+  },
 });
-
-function onActionClick(e: OnActionClickParams<SystemRoleApi.SystemRole>) {
-  switch (e.code) {
-    case 'delete': {
-      onDelete(e.row);
-      break;
-    }
-    case 'edit': {
-      onEdit(e.row);
-      break;
-    }
-  }
+function refresh() {
+  void gridApi.query();
 }
-
-/**
- * 将Antd的Modal.confirm封装为promise，方便在异步函数中调用。
- * @param content 提示内容
- * @param title 提示标题
- */
-function confirm(content: string, title: string) {
-  return new Promise((reslove, reject) => {
-    Modal.confirm({
-      content,
-      onCancel() {
-        reject(new Error('已取消'));
-      },
-      onOk() {
-        reslove(true);
-      },
-      title,
-    });
+function create() {
+  formApi.setData({}).open();
+}
+function edit(row: Row) {
+  formApi.setData(row).open();
+}
+async function remove(row: Row) {
+  await deleteRecord(kind, row);
+  message.success('已删除');
+  refresh();
+}
+function toggle(row: Row) {
+  Modal.confirm({
+    title: '修改状态',
+    content: `确认${row.enabled ? '停用' : '启用'}${row.name || row.username}？`,
+    async onOk() {
+      await changeStatus(kind, row);
+      refresh();
+    },
   });
 }
-
-/**
- * 状态开关即将改变
- * @param newStatus 期望改变的状态值
- * @param row 行数据
- * @returns 返回false则中止改变，返回其他值（undefined、true）则允许改变
- */
-async function onStatusChange(
-  newStatus: number,
-  row: SystemRoleApi.SystemRole,
-) {
-  const status: Recordable<string> = {
-    0: '禁用',
-    1: '启用',
-  };
-  try {
-    await confirm(
-      `你要将${row.name}的状态切换为 【${status[newStatus.toString()]}】 吗？`,
-      `切换状态`,
-    );
-    await updateRole(row.id, { status: newStatus });
-    return true;
-  } catch {
-    return false;
-  }
+function actions(row: Row) {
+  return [
+    {
+      text: '编辑',
+      icon: 'lucide:edit',
+      auth: [permission(kind, 'edit', row)],
+      ifShow: !row.administrator || row.id === users.userInfo?.userId,
+      onClick: () => edit(row),
+    },
+    {
+      text: '授权',
+      icon: 'lucide:shield-check',
+      ifShow: can('platform:role:authorize') || can('platform:role:units'),
+      onClick: () => grantsApi.setData({ kind: 'roles', row }).open(),
+    },
+  ];
 }
-
-function onEdit(row: SystemRoleApi.SystemRole) {
-  formDrawerApi.setData(row).open();
-}
-
-function onDelete(row: SystemRoleApi.SystemRole) {
-  const hideLoading = message.loading({
-    content: $t('ui.actionMessage.deleting', [row.name]),
-    duration: 0,
-    key: 'action_process_msg',
-  });
-  deleteRole(row.id)
-    .then(() => {
-      message.success({
-        content: $t('ui.actionMessage.deleteSuccess', [row.name]),
-        key: 'action_process_msg',
-      });
-      onRefresh();
-    })
-    .catch(() => {
-      hideLoading();
-    });
-}
-
-function onRefresh() {
-  gridApi.query();
-}
-
-function onCreate() {
-  formDrawerApi.setData(null).open();
+function more(row: Row) {
+  return [
+    {
+      text: row.enabled ? '停用' : '启用',
+      icon: 'lucide:power',
+      auth: [permission(kind, 'status', row)],
+      ifShow: !row.administrator,
+      onClick: () => toggle(row),
+    },
+    {
+      text: '删除',
+      icon: 'lucide:trash-2',
+      danger: true,
+      auth: [permission(kind, 'delete', row)],
+      ifShow: !row.administrator,
+      popConfirm: {
+        title: `确认删除 ${row.name || row.username}？`,
+        confirm: () => remove(row),
+      },
+    },
+  ];
 }
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="onRefresh" />
-    <Grid :table-title="$t('system.role.list')">
+    <FormDrawer @success="refresh" /><GrantsDrawer @success="refresh" />
+
+    <Alert
+      v-if="!queryAllowed"
+      class="mb-4"
+      type="info"
+      message="当前账号拥有菜单访问权限，但尚未授予查询权限。"
+    />
+
+    <Grid table-title="角色管理">
       <template #toolbar-tools>
-        <Button type="primary" @click="onCreate">
-          <Plus class="size-5" />
-          {{ $t('ui.actionTitle.create', [$t('system.role.name')]) }}
+        <Button v-if="createAllowed" type="primary" @click="create">
+          <Plus class="size-5" />新增角色
         </Button>
+      </template>
+      <template #state="{ row }">
+        <Tag :color="row.enabled ? 'success' : 'default'">
+          {{ row.enabled ? '有效' : '无效' }}
+        </Tag>
+      </template>
+      <template #action="{ row }">
+        <VbenTableAction
+          :actions="actions(row as Row)"
+          :dropdown-actions="more(row as Row)"
+        />
       </template>
     </Grid>
   </Page>

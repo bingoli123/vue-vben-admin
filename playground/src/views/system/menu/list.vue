@@ -1,162 +1,185 @@
-<script lang="ts" setup>
-import type {
-  OnActionClickParams,
-  VxeTableGridOptions,
-} from '#/adapter/vxe-table';
+<script setup lang="ts">
+import type { Kind, Row } from '#/api/system/admin';
 
+import { computed } from 'vue';
+
+import { useAccess } from '@vben/access';
 import { Page, useVbenDrawer } from '@vben/common-ui';
 import { IconifyIcon, Plus } from '@vben/icons';
-import { $t } from '@vben/locales';
+import { useUserStore } from '@vben/stores';
 
-import { MenuBadge } from '@vben-core/menu-ui';
+import { Alert, Button, message, Modal, Tag } from 'antdv-next';
 
-import { Button, message } from 'antdv-next';
-
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { deleteMenu, getMenuList, SystemMenuApi } from '#/api/system/menu';
+import { useVbenVxeGrid, VbenTableAction } from '#/adapter/vxe-table';
+import { menuIcon } from '#/api/core/menu';
+import {
+  changeStatus,
+  deleteRecord,
+  getList,
+  permission,
+} from '#/api/system/admin';
 
 import { useColumns } from './data';
 import Form from './modules/form.vue';
 
-const [FormDrawer, formDrawerApi] = useVbenDrawer({
+const kind: Kind = 'menus';
+const { hasAccessByCodes: canCodes } = useAccess();
+const users = useUserStore();
+const can = (code: string) => canCodes([code]);
+const queryAllowed = computed(
+  () => can(permission(kind, 'query')) || can('platform:permission:query'),
+);
+const createAllowed = computed(
+  () => can(permission(kind, 'add')) || can('platform:permission:add'),
+);
+const [FormDrawer, formApi] = useVbenDrawer({
   connectedComponent: Form,
   destroyOnClose: true,
 });
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: {
-    columns: useColumns(onActionClick),
+    columns: useColumns(),
     height: 'auto',
     keepSource: true,
-    pagerConfig: {
-      enabled: false,
+    rowConfig: { keyField: 'id' },
+    pagerConfig: { enabled: false },
+    treeConfig: {
+      transform: true,
+      rowField: 'id',
+      parentField: 'parentId',
+      expandAll: true,
     },
     proxyConfig: {
       ajax: {
-        query: async (_params) => {
-          return await getMenuList();
+        query: async () => {
+          if (!queryAllowed.value) return [];
+          return getList(kind, {});
         },
       },
-    },
-    rowConfig: {
-      keyField: 'id',
     },
     toolbarConfig: {
       custom: true,
       export: false,
       refresh: true,
+      search: false,
       zoom: true,
     },
-    treeConfig: {
-      parentField: 'pid',
-      rowField: 'id',
-      transform: false,
-    },
-  } as VxeTableGridOptions,
+  },
 });
-
-function onActionClick({
-  code,
-  row,
-}: OnActionClickParams<SystemMenuApi.SystemMenu>) {
-  switch (code) {
-    case 'append': {
-      onAppend(row);
-      break;
-    }
-    case 'delete': {
-      onDelete(row);
-      break;
-    }
-    case 'edit': {
-      onEdit(row);
-      break;
-    }
-    default: {
-      break;
-    }
-  }
+function refresh() {
+  void gridApi.query();
 }
-
-function onRefresh() {
-  gridApi.query();
+function create() {
+  formApi.setData({ menuType: can('platform:module:add') ? 'C' : 'F' }).open();
 }
-function onEdit(row: SystemMenuApi.SystemMenu) {
-  formDrawerApi.setData(row).open();
+function edit(row: Row) {
+  formApi.setData(row).open();
 }
-function onCreate() {
-  formDrawerApi.setData({}).open();
+async function remove(row: Row) {
+  await deleteRecord(kind, row);
+  message.success('已删除');
+  refresh();
 }
-function onAppend(row: SystemMenuApi.SystemMenu) {
-  formDrawerApi.setData({ pid: row.id }).open();
-}
-
-function onDelete(row: SystemMenuApi.SystemMenu) {
-  const hideLoading = message.loading({
-    content: $t('ui.actionMessage.deleting', [row.name]),
-    duration: 0,
-    key: 'action_process_msg',
+function toggle(row: Row) {
+  Modal.confirm({
+    title: '修改状态',
+    content: `确认${row.enabled ? '停用' : '启用'}${row.name || row.username}？`,
+    async onOk() {
+      await changeStatus(kind, row);
+      refresh();
+    },
   });
-  deleteMenu(row.id)
-    .then(() => {
-      message.success({
-        content: $t('ui.actionMessage.deleteSuccess', [row.name]),
-        key: 'action_process_msg',
-      });
-      onRefresh();
-    })
-    .catch(() => {
-      hideLoading();
-    });
+}
+function actions(row: Row) {
+  return [
+    {
+      text: '编辑',
+      icon: 'lucide:edit',
+      auth: [permission(kind, 'edit', row)],
+      ifShow: !row.administrator || row.id === users.userInfo?.userId,
+      onClick: () => edit(row),
+    },
+  ];
+}
+function more(row: Row) {
+  return [
+    {
+      text: '新增下级',
+      icon: 'lucide:folder-plus',
+      ifShow:
+        row.menuType !== 'F' &&
+        (row.menuType !== 'C' || row.pageType === '普通页面'),
+      auth: [
+        permission(kind, 'add', {
+          ...row,
+          menuType: row.menuType === 'C' ? 'F' : 'C',
+        }),
+      ],
+      onClick: () =>
+        formApi
+          .setData({
+            parentId: row.id,
+            menuType: row.menuType === 'C' ? 'F' : 'C',
+          })
+          .open(),
+    },
+    {
+      text: row.enabled ? '停用' : '启用',
+      icon: 'lucide:power',
+      auth: [permission(kind, 'status', row)],
+      ifShow: !row.administrator,
+      onClick: () => toggle(row),
+    },
+    {
+      text: '删除',
+      icon: 'lucide:trash-2',
+      danger: true,
+      auth: [permission(kind, 'delete', row)],
+      ifShow: !row.administrator,
+      popConfirm: {
+        title: `确认删除 ${row.name || row.username}？`,
+        confirm: () => remove(row),
+      },
+    },
+  ];
 }
 </script>
 <template>
   <Page auto-content-height>
-    <FormDrawer @success="onRefresh" />
-    <Grid>
+    <FormDrawer @success="refresh" />
+
+    <Alert
+      v-if="!queryAllowed"
+      class="mb-4"
+      type="info"
+      message="当前账号拥有菜单访问权限，但尚未授予查询权限。"
+    />
+
+    <Grid table-title="菜单管理">
+      <template #name="{ row }">
+        <span class="inline-flex items-center gap-2"><IconifyIcon
+            v-if="row.icon"
+            :icon="menuIcon(row.icon)!"
+            class="size-4"
+          />{{ row.name }}</span>
+      </template>
       <template #toolbar-tools>
-        <Button type="primary" @click="onCreate">
-          <Plus class="size-5" />
-          {{ $t('ui.actionTitle.create', [$t('system.menu.name')]) }}
+        <Button v-if="createAllowed" type="primary" @click="create">
+          <Plus class="size-5" />新增菜单
         </Button>
       </template>
-      <template #title="{ row }">
-        <div class="flex w-full items-center gap-1">
-          <div class="size-5 shrink-0">
-            <IconifyIcon
-              v-if="row.type === 'button'"
-              icon="carbon:security"
-              class="size-full"
-            />
-            <IconifyIcon
-              v-else-if="row.meta?.icon"
-              :icon="row.meta?.icon || 'carbon:circle-dash'"
-              class="size-full"
-            />
-          </div>
-          <span class="flex-auto">{{ $t(row.meta?.title) }}</span>
-          <div class="items-center justify-end"></div>
-        </div>
-        <MenuBadge
-          v-if="row.meta?.badgeType"
-          class="menu-badge"
-          :badge="row.meta.badge"
-          :badge-type="row.meta.badgeType"
-          :badge-variants="row.meta.badgeVariants"
+      <template #state="{ row }">
+        <Tag :color="row.enabled ? 'success' : 'default'">
+          {{ row.enabled ? '有效' : '无效' }}
+        </Tag>
+      </template>
+      <template #action="{ row }">
+        <VbenTableAction
+          :actions="actions(row as Row)"
+          :dropdown-actions="more(row as Row)"
         />
       </template>
     </Grid>
   </Page>
 </template>
-<style lang="scss" scoped>
-.menu-badge {
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-
-  & > :deep(div) {
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-}
-</style>

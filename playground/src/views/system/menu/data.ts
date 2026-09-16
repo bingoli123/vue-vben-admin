@@ -1,109 +1,33 @@
-import type { OnActionClickFn, VxeTableGridColumns } from '#/adapter/vxe-table';
-import type { SystemMenuApi } from '#/api/system/menu';
-
-import { $t } from '#/locales';
-
-export function getMenuTypeOptions() {
+import type { VxeTableGridColumns } from '#/adapter/vxe-table';
+export function useColumns(): VxeTableGridColumns {
   return [
     {
-      color: 'processing',
-      label: $t('system.menu.typeCatalog'),
-      value: 'catalog',
-    },
-    { color: 'default', label: $t('system.menu.typeMenu'), value: 'menu' },
-    { color: 'error', label: $t('system.menu.typeButton'), value: 'button' },
-    {
-      color: 'success',
-      label: $t('system.menu.typeEmbedded'),
-      value: 'embedded',
-    },
-    { color: 'warning', label: $t('system.menu.typeLink'), value: 'link' },
-  ];
-}
-
-export function useColumns(
-  onActionClick: OnActionClickFn<SystemMenuApi.SystemMenu>,
-): VxeTableGridColumns<SystemMenuApi.SystemMenu> {
-  return [
-    {
-      align: 'left',
-      field: 'meta.title',
-      fixed: 'left',
-      slots: { default: 'title' },
-      title: $t('system.menu.menuTitle'),
+      field: 'name',
+      title: '名称',
+      minWidth: 220,
       treeNode: true,
-      width: 250,
+      slots: { default: 'name' },
     },
     {
-      align: 'center',
-      cellRender: { name: 'CellTag', options: getMenuTypeOptions() },
-      field: 'type',
-      title: $t('system.menu.type'),
-      width: 100,
+      field: 'menuType',
+      title: '类型',
+      width: 90,
+      formatter: ({ cellValue }) =>
+        ({ M: '目录', C: '菜单', F: '按钮' })[cellValue as 'C' | 'F' | 'M'],
     },
+    { field: 'code', title: '菜单编码', minWidth: 140 },
+    { field: 'perms', title: '权限标识', minWidth: 140 },
+    { field: 'url', title: '业务页面', minWidth: 140 },
+    { field: 'pageType', title: '页面用途', minWidth: 140 },
+    { field: 'reportFile', title: '报表文件', minWidth: 140 },
+    { field: 'sortOrder', title: '排序', minWidth: 140 },
+    { field: 'state', title: '状态', width: 100, slots: { default: 'state' } },
     {
-      field: 'authCode',
-      title: $t('system.menu.authCode'),
-      width: 200,
-    },
-    {
-      align: 'left',
-      field: 'path',
-      title: $t('system.menu.path'),
-      width: 200,
-    },
-
-    {
-      align: 'left',
-      field: 'component',
-      formatter: ({ row }) => {
-        switch (row.type) {
-          case 'catalog':
-          case 'menu': {
-            return row.component ?? '';
-          }
-          case 'embedded': {
-            return row.meta?.iframeSrc ?? '';
-          }
-          case 'link': {
-            return row.meta?.link ?? '';
-          }
-        }
-        return '';
-      },
-      minWidth: 200,
-      title: $t('system.menu.component'),
-    },
-    {
-      cellRender: { name: 'CellTag' },
-      field: 'status',
-      title: $t('system.menu.status'),
-      width: 100,
-    },
-
-    {
-      align: 'right',
-      cellRender: {
-        attrs: {
-          nameField: 'name',
-          onClick: onActionClick,
-        },
-        name: 'CellOperation',
-        options: [
-          {
-            code: 'append',
-            text: '新增下级',
-          },
-          'edit', // 默认的编辑按钮
-          'delete', // 默认的删除按钮
-        ],
-      },
       field: 'operation',
+      title: '操作',
+      width: 230,
       fixed: 'right',
-      headerAlign: 'center',
-      showOverflow: false,
-      title: $t('system.menu.operation'),
-      width: 200,
+      slots: { default: 'action' },
     },
   ];
 }

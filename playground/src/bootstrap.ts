@@ -17,7 +17,6 @@ import { router } from '#/router';
 import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm, useVbenForm } from './adapter/form';
 import App from './app.vue';
-import { initTimezone } from './timezone-init';
 
 async function bootstrap(namespace: string) {
   // 演示扩展语言：d.ts 模块增强已向 SupportedLanguages 注册表追加 zh-TW
@@ -60,10 +59,9 @@ async function bootstrap(namespace: string) {
   await setupI18n(app);
 
   // 配置 pinia-tore
-  await initStores(app, { namespace });
+  await initStores(app, { namespace, storage: sessionStorage });
 
   // 初始化时区HANDLER
-  initTimezone();
 
   // 安装权限指令
   registerAccessDirective(app);
@@ -94,11 +92,6 @@ async function bootstrap(namespace: string) {
   });
 
   app.mount('#app');
-
-  if (window.__VBEN_LAYOUT_E2E__) {
-    const { installLayoutTestApi } = await import('./testing/layout-test-api');
-    installLayoutTestApi();
-  }
 }
 
 export { bootstrap };
