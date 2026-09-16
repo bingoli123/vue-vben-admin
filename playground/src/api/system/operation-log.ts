@@ -1,5 +1,9 @@
 import type { PageResult } from './admin';
 
+import { downloadFileFromBlob } from '@vben/utils';
+
+import { message } from 'antdv-next';
+
 import { requestClient } from '#/api/request';
 
 /** 日志全部为历史快照；未知字段保留空值，不用当前用户/单位信息补齐。 */
@@ -28,11 +32,14 @@ export interface OperationLog {
   durationMs: number;
 }
 export const logQueryPermission = 'platform:operation-log:query';
+export const logPermission = (action: string) =>
+  `platform:operation-log:${action}`;
 export const operationTypes = [
   { label: '登录', value: 'LOGIN' },
   { label: '退出', value: 'LOGOUT' },
   { label: '新增', value: 'CREATE' },
   { label: '修改', value: 'UPDATE' },
+  { label: '导出', value: 'EXPORT' },
 ];
 export const deviceTypes = [
   { label: '电脑', value: 'PC' },
@@ -78,4 +85,27 @@ export async function getOperationLogs(params: Record<string, unknown>) {
 }
 export function getOperationLog(id: string) {
   return requestClient.get<OperationLog>(`/admin/operation-logs/${id}`);
+}
+
+/** 导出沿用已提交筛选，去掉分页；只有有效 XLSX 才触发下载。 */
+export async function exportOperationLogs(filters: Record<string, unknown>) {
+  const {
+    page: _page,
+    size: _size,
+    ...params
+  } = logQueryParams(filters, 1, 20);
+  const source = await requestClient.get<Blob>('/admin/operation-logs/export', {
+    params,
+    responseType: 'blob',
+    responseReturn: 'body',
+  });
+  if (
+    source.type !==
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    source.size === 0
+  ) {
+    message.error('导出失败，未收到有效的 Excel 文件，请重试');
+    return;
+  }
+  downloadFileFromBlob({ source, fileName: '操作日志.xlsx' });
 }
