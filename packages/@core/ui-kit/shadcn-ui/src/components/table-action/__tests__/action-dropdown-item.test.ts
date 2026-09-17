@@ -36,7 +36,7 @@ describe('表格下拉操作确认', () => {
     expect(wrapper.emitted('confirm')).toHaveLength(1);
   });
 
-  it('异步操作失败时保留确认上下文并允许重试', async () => {
+  it('异步操作失败时关闭确认交互且不重复展示错误', async () => {
     const confirm = vi.fn().mockRejectedValue({
       response: { data: { message: '当前单位关联了用户，请先调整用户' } },
     });
@@ -45,12 +45,8 @@ describe('表格下拉操作确认', () => {
 
     await button.trigger('click');
     await flushPromises();
-    expect(wrapper.emitted('confirm')).toBeUndefined();
+    expect(wrapper.emitted('confirm')).toHaveLength(1);
     expect(button.attributes('disabled')).toBe('false');
-    expect(wrapper.text()).toContain('当前单位关联了用户，请先调整用户');
-
-    await button.trigger('click');
-    await flushPromises();
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).not.toContain('当前单位关联了用户，请先调整用户');
   });
 });
