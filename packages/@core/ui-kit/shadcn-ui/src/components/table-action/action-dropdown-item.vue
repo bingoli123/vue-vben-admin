@@ -19,6 +19,8 @@ const props = defineProps<{ action: ActionItem }>();
 const emit = defineEmits<{ confirm: [] }>();
 const { $t } = useSimpleLocale();
 const open = ref(false);
+const confirming = ref(false);
+const confirmError = ref('');
 
 const itemClass = computed(() =>
   cn(
@@ -42,19 +44,38 @@ function onClick() {
   props.action.onClick?.();
 }
 
-function onConfirm() {
-  open.value = false;
+async function onConfirm() {
+  if (confirming.value) return;
+  confirming.value = true;
+  confirmError.value = '';
   const pc = props.action.popConfirm;
-  if (pc?.confirm) {
-    pc.confirm();
-  } else {
-    props.action.onClick?.();
+  try {
+    if (pc?.confirm) {
+      await pc.confirm();
+    } else {
+      await props.action.onClick?.();
+    }
+    open.value = false;
+    // 只有操作成功才关闭整个下拉菜单；失败时保留确认上下文，错误原因由请求层统一展示。
+    emit('confirm');
+  } catch (error) {
+    const knownError = error as {
+      message?: unknown;
+      response?: { data?: { message?: unknown } };
+    };
+    const responseMessage = knownError?.response?.data?.message;
+    const errorMessage = knownError?.message;
+    confirmError.value =
+      (typeof responseMessage === 'string' && responseMessage) ||
+      (typeof errorMessage === 'string' && errorMessage) ||
+      '操作失败，请稍后重试';
+  } finally {
+    confirming.value = false;
   }
-  // 确认后关闭整个下拉菜单
-  emit('confirm');
 }
 
 function onCancel() {
+  confirmError.value = '';
   open.value = false;
 }
 </script>
@@ -88,11 +109,15 @@ function onCancel() {
       <div class="text-foreground mb-3 text-sm">
         {{ action.popConfirm.title ?? $t('confirmTitle') }}
       </div>
+      <div v-if="confirmError" class="text-destructive mb-3 text-sm">
+        {{ confirmError }}
+      </div>
       <div class="flex justify-end gap-2">
         <VbenButton size="sm" variant="outline" @click="onCancel">
           {{ action.popConfirm.cancelText ?? $t('cancel') }}
         </VbenButton>
         <VbenButton
+          :disabled="confirming"
           :variant="action.danger ? 'destructive' : 'default'"
           size="sm"
           @click="onConfirm"

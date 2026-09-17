@@ -16,7 +16,7 @@ export interface TableActionPopConfirm {
   /** 取消按钮文案 */
   cancelText?: string;
   /** 确认回调；未提供时回退到 action.onClick */
-  confirm?: () => void;
+  confirm?: () => Promise<unknown> | unknown;
   /** 确认按钮文案 */
   okText?: string;
   /** 提示标题 */
@@ -41,7 +41,7 @@ export interface ActionItem {
   /** 加载状态 */
   loading?: boolean;
   /** 点击回调 */
-  onClick?: () => void;
+  onClick?: () => Promise<unknown> | unknown;
   /** 气泡确认框 */
   popConfirm?: TableActionPopConfirm;
   /** 尺寸 */
